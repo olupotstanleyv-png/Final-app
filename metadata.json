@@ -1,0 +1,9 @@
+{
+  "name": "order to stanley",
+  "description": "A modern restaurant website featuring a WhatsApp-style ordering chatbot, an admin panel for menu management, and a suite of AI tools for food photography and marketing generation.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
