@@ -10,6 +10,8 @@ interface MenuProps {
   menu: MenuItem[];
 }
 
+const DELIVERY_FEE = 15.00; // Configurable delivery fee
+
 const Menu: React.FC<MenuProps> = ({ menu }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -111,7 +113,9 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
   };
 
   const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const finalTotal = Number((cartTotal * 1.05).toFixed(2));
+  const deliveryCharge = orderType === 'delivery' ? DELIVERY_FEE : 0;
+  const tax = cartTotal * 0.05;
+  const finalTotal = Number((cartTotal + tax + deliveryCharge).toFixed(2));
 
   const handlePlaceOrder = async () => {
     if (!customerName || !customerPhone) {
@@ -483,7 +487,7 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
           <div className="fixed inset-0 z-50 flex justify-end">
              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeCart}></div>
              <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-                <div className="bg-stone-900 text-white p-6 flex justify-between items-center shadow-md z-10">
+                <div className="bg-stone-900 text-white p-6 flex justify-between items-center shadow-md z-10 shrink-0">
                     <h2 className="text-xl font-bold flex items-center gap-2"><ShoppingCart className="text-orange-500"/> {confirmedOrder ? 'Order Placed' : t('cart_title')}</h2>
                     <button onClick={closeCart} className="hover:text-orange-500 transition"><X size={24}/></button>
                 </div>
@@ -611,63 +615,72 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Order Type */}
-                                    <div className="mt-4 bg-white p-4 rounded-xl border border-stone-200">
-                                        <h3 className="font-bold text-sm text-stone-800 mb-3">Order Type</h3>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => setOrderType('dine-in')} className={`flex-1 py-2 rounded-lg text-xs font-bold border ${orderType === 'dine-in' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-500 border-stone-200'}`}>
-                                                Dine-In
-                                            </button>
-                                            <button onClick={() => setOrderType('delivery')} className={`flex-1 py-2 rounded-lg text-xs font-bold border ${orderType === 'delivery' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-500 border-stone-200'}`}>
-                                                Delivery
-                                            </button>
-                                            <button onClick={() => setOrderType('pickup')} className={`flex-1 py-2 rounded-lg text-xs font-bold border ${orderType === 'pickup' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-500 border-stone-200'}`}>
-                                                Pickup
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Payment Method */}
-                                    <div className="mt-4 bg-white p-4 rounded-xl border border-stone-200">
-                                        <h3 className="font-bold text-sm text-stone-800 mb-3">Payment Method</h3>
-                                        <div className="space-y-2">
-                                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${paymentMethod === 'cash' ? 'border-orange-500 bg-orange-50' : 'border-stone-200'}`}>
-                                                <input type="radio" name="payment" className="hidden" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} />
-                                                <Banknote size={18} className="text-stone-600"/>
-                                                <span className="text-sm font-medium">Cash on Delivery/Pickup</span>
-                                            </label>
-                                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${paymentMethod === 'card' ? 'border-orange-500 bg-orange-50' : 'border-stone-200'}`}>
-                                                <input type="radio" name="payment" className="hidden" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} />
-                                                <CreditCard size={18} className="text-stone-600"/>
-                                                <span className="text-sm font-medium">Credit Card (Terminal)</span>
-                                            </label>
-                                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${paymentMethod === 'online_link' ? 'border-orange-500 bg-orange-50' : 'border-stone-200'}`}>
-                                                <input type="radio" name="payment" className="hidden" checked={paymentMethod === 'online_link'} onChange={() => setPaymentMethod('online_link')} />
-                                                <LinkIcon size={18} className="text-stone-600"/>
-                                                <span className="text-sm font-medium">Generate Payment Link</span>
-                                            </label>
-                                        </div>
-                                    </div>
                                 </div>
                             )}
                         </div>
 
                         {cart.length > 0 && (
-                            <div className="p-6 border-t border-stone-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                            <div className="p-6 border-t border-stone-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] shrink-0 z-20 overflow-y-auto max-h-[50vh]">
+                                
+                                {/* Order Type Selector - Moved Here */}
+                                <div className="mb-4">
+                                    <div className="flex bg-stone-100 p-1 rounded-xl">
+                                        <button 
+                                            onClick={() => setOrderType('dine-in')}
+                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${orderType === 'dine-in' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
+                                        >
+                                            Dine-In
+                                        </button>
+                                        <button 
+                                            onClick={() => setOrderType('delivery')}
+                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${orderType === 'delivery' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
+                                        >
+                                            Delivery
+                                        </button>
+                                        <button 
+                                            onClick={() => setOrderType('pickup')}
+                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${orderType === 'pickup' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
+                                        >
+                                            Pickup
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Payment Method - Moved Here */}
+                                <div className="mb-4">
+                                    <h3 className="font-bold text-xs text-stone-500 uppercase mb-2">Payment</h3>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setPaymentMethod('cash')} className={`flex-1 p-2 rounded-lg border text-xs font-bold flex flex-col items-center gap-1 ${paymentMethod === 'cash' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-stone-200 text-stone-500'}`}>
+                                            <Banknote size={16}/> Cash
+                                        </button>
+                                        <button onClick={() => setPaymentMethod('card')} className={`flex-1 p-2 rounded-lg border text-xs font-bold flex flex-col items-center gap-1 ${paymentMethod === 'card' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-stone-200 text-stone-500'}`}>
+                                            <CreditCard size={16}/> Card
+                                        </button>
+                                        <button onClick={() => setPaymentMethod('online_link')} className={`flex-1 p-2 rounded-lg border text-xs font-bold flex flex-col items-center gap-1 ${paymentMethod === 'online_link' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-stone-200 text-stone-500'}`}>
+                                            <LinkIcon size={16}/> Link
+                                        </button>
+                                    </div>
+                                </div>
+
                                 {/* Totals */}
-                                <div className="space-y-2 mb-6">
+                                <div className="space-y-2 mb-6 border-t border-stone-100 pt-4">
                                     <div className="flex justify-between text-stone-500 text-xs">
                                         <span>Subtotal</span>
                                         <span>${cartTotal.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between text-stone-500 text-xs">
-                                        <span>Taxes & Fees</span>
-                                        <span>${(cartTotal * 0.05).toFixed(2)}</span>
+                                        <span>Taxes (5%)</span>
+                                        <span>${tax.toFixed(2)}</span>
                                     </div>
+                                    {orderType === 'delivery' && (
+                                        <div className="flex justify-between text-orange-600 text-xs font-bold bg-orange-50 px-2 py-1 rounded">
+                                            <span>Delivery Fee</span>
+                                            <span>${deliveryCharge.toFixed(2)}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between items-center pt-2 border-t border-stone-100">
                                         <span className="text-stone-800 font-bold">Total</span>
-                                        <span className="text-2xl font-bold text-orange-600">${finalTotal}</span>
+                                        <span className="text-2xl font-bold text-orange-600">${finalTotal.toFixed(2)}</span>
                                     </div>
                                 </div>
                                 

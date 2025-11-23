@@ -1,4 +1,5 @@
 
+
 import { 
   GoogleGenAI, 
   Chat, 
@@ -51,11 +52,14 @@ export const initChatSession = (menu: MenuItem[]) => {
     4. Delivery Address
     5. Payment Method ('Cash', 'Card', 'Online Link')
 
+    *** ORDER HANDOFF ***
+    If the user has items in their "Draft Order" and mentions WhatsApp, tell them they can click the "Finalize on WhatsApp" button to transfer their cart instantly.
+
     *** STYLE ***
     - Short, punchy messages (WhatsApp style).
     - Use emojis 🍔 🥗.
     - If an item is "Sold Out", apologize and suggest a similar available item.
-    - If they want to "switch to WhatsApp", encourage them to click the WhatsApp button in the header.
+    - If they want to "switch to WhatsApp", encourage them to click the WhatsApp button in the header OR the "Finalize on WhatsApp" button if they have a draft order.
 
     *** MENU KNOWLEDGE ***
     ${menuStr}

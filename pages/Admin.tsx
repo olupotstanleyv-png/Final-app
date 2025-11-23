@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem, Order, DeliveryAgent, AdminUser, AnalyticsMetrics, SystemLog, ChatMessage, CartItem, OrderType, InventoryForecast, Supplier, PurchaseOrder, InventoryTransaction } from '../types';
 import { 
@@ -132,12 +133,15 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
         // Simulate Fleet Movement if on fleet tab
         if (activeTab === 'fleet') {
              setAgents(prevAgents => prevAgents.map(a => {
-                // Small jitter to simulate live GPS
-                return {
-                    ...a,
-                    currentLat: a.currentLat + (Math.random() - 0.5) * 0.0001,
-                    currentLng: a.currentLng + (Math.random() - 0.5) * 0.0001
-                };
+                // Small jitter to simulate live GPS - Increased magnitude slightly for better visibility
+                if (a.status !== 'offline') {
+                    return {
+                        ...a,
+                        currentLat: a.currentLat + (Math.random() - 0.5) * 0.0004, 
+                        currentLng: a.currentLng + (Math.random() - 0.5) * 0.0004
+                    };
+                }
+                return a;
              }));
         }
 
@@ -644,9 +648,6 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
                     <NavItem id="settings" icon={Settings} label="Configuration" />
                 </nav>
             </div>
-            <div className="absolute bottom-0 left-0 w-full p-4 border-t border-stone-100 bg-white">
-                 <Link to="/" className="flex items-center gap-2 text-stone-500 hover:text-stone-900 transition px-4 py-2"><LogOut size={16} /><span className="text-sm font-medium">Exit</span></Link>
-            </div>
         </div>
 
         {/* MAIN CONTENT WRAPPER */}
@@ -670,6 +671,11 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
                      </button>
                      
                      <div className="h-6 w-px bg-stone-200"></div>
+
+                     {/* Exit Button - Moved from sidebar */}
+                     <Link to="/" className="flex items-center gap-2 text-stone-500 hover:text-red-600 transition text-sm font-medium bg-stone-100 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-100">
+                        <LogOut size={16} /> <span className="hidden lg:inline">Exit Panel</span>
+                     </Link>
 
                      <div className="w-8 h-8 bg-stone-200 rounded-full flex items-center justify-center text-stone-500 border border-stone-300 cursor-pointer hover:bg-stone-300 transition">
                         <User size={16}/>

@@ -201,7 +201,11 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ menu }) => {
   const handleSwitchToWhatsApp = () => {
       // Get context to pass
       const lastBotMessage = messages.filter(m => m.sender === 'bot').pop()?.text;
-      const draftOrderData = detectedOrder ? { items: detectedOrder.items, customerName: detectedOrder.customerName || userName } : undefined;
+      const draftOrderData = detectedOrder ? { 
+          items: detectedOrder.items, 
+          customerName: detectedOrder.customerName || userName,
+          total: detectedOrder.total
+      } : undefined;
       
       const url = generateWhatsAppLinkWithContext(lastBotMessage, draftOrderData);
       window.open(url, '_blank');
@@ -362,13 +366,21 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ menu }) => {
                               </div>
 
                               {isOrderReady ? (
-                                <button 
-                                    onClick={handlePlaceOrder}
-                                    disabled={placingOrder}
-                                    className="w-full bg-green-600 hover:bg-green-500 text-white py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-md transition"
-                                >
-                                    {placingOrder ? "Sending..." : <><CheckCircle size={16}/> Confirm Order</>}
-                                </button>
+                                <div className="space-y-2">
+                                    <button 
+                                        onClick={handlePlaceOrder}
+                                        disabled={placingOrder}
+                                        className="w-full bg-stone-900 hover:bg-stone-800 text-white py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-md transition"
+                                    >
+                                        {placingOrder ? "Sending..." : <><CheckCircle size={16}/> Confirm on Website</>}
+                                    </button>
+                                    <button 
+                                        onClick={handleSwitchToWhatsApp}
+                                        className="w-full bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition"
+                                    >
+                                        <MessageCircle size={16}/> Finalize on WhatsApp
+                                    </button>
+                                </div>
                               ) : (
                                 <div className="text-[10px] text-center text-stone-400 italic bg-stone-50 py-2 rounded-lg">
                                     Bot is collecting details...

@@ -1,4 +1,5 @@
 
+
 import { MenuItem, Order, DeliveryAgent, AdminUser, SystemLog, AnalyticsMetrics, CartItem, Supplier, PurchaseOrder, InventoryForecast, POItem, InventoryTransaction, ProofOfDelivery } from '../types';
 
 const STORAGE_KEY = 'gourmetai_menu';
@@ -699,12 +700,13 @@ export const generateWhatsAppChatOrder = (items: any[], customerName: string) =>
     return `https://wa.me/${RESTAURANT_PHONE}?text=${encodeURIComponent(text)}`;
 };
 
-export const generateWhatsAppLinkWithContext = (messageContext?: string, draftOrder?: { items: any[], customerName?: string }) => {
+export const generateWhatsAppLinkWithContext = (messageContext?: string, draftOrder?: { items: any[], customerName?: string, total?: number }) => {
     let text = "";
     
     if (draftOrder && draftOrder.items.length > 0) {
         const itemsList = draftOrder.items.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
-        text = `*Hi! I was chatting on your website.* 👋\n\nI'd like to finalize this order on WhatsApp:\n\n*Items:*\n${itemsList}\n\n*Name:* ${draftOrder.customerName || 'Guest'}`;
+        const totalStr = draftOrder.total ? `\n*Est. Total: $${draftOrder.total.toFixed(2)}*` : '';
+        text = `*Hi! I was chatting on your website.* 👋\n\nI'd like to finalize this order on WhatsApp:\n\n*Items:*\n${itemsList}${totalStr}\n\n*Name:* ${draftOrder.customerName || 'Guest'}\n\nPlease confirm availability and delivery.`;
     } else if (messageContext) {
         text = `*Hi! I was chatting on your website.* 👋\n\nHere is my last question:\n"${messageContext}"`;
     } else {
