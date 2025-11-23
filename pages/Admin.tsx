@@ -1,16 +1,14 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MenuItem, Order, DeliveryAgent, AdminUser, AnalyticsMetrics, SystemLog, ChatMessage, CartItem, OrderType, InventoryForecast, Supplier, PurchaseOrder, InventoryTransaction } from '../types';
 import { 
-  Trash2, Plus, Save, Sparkles, Wand2, Loader2, Database, Check, 
-  AlertCircle, ExternalLink, Copy, ShoppingBag, RefreshCw, 
-  Network, Code, Pencil, X, MessageCircle, 
-  UtensilsCrossed, Settings, ChevronRight, LogOut, Palette, Image as ImageIcon,
-  Truck, Map, Ban, CheckCircle, DollarSign, Filter, Users, User, Shield, Mail, Bike,
-  Activity, BarChart3, TestTube, Lock, Eye, AlertTriangle, Terminal, PlayCircle, Bell, Bot, MapPin, Monitor, Printer, Calculator, FileSpreadsheet, Download, ScanLine, Box, Tag, Layers, ClipboardList, PackagePlus, Scan, Factory, CalendarRange, TrendingUp, AlertOctagon, Archive, Phone, Clock, FileCheck, RefreshCcw, Search, Navigation, Battery, Signal, Timer, Flame, ArrowRightCircle, Package, Send, Edit, Zap
+  Trash2, Plus, Save, Sparkles, Wand2, Loader2, Check, 
+  Search, ClipboardList, UtensilsCrossed, Settings, LogOut, Palette, Image as ImageIcon,
+  Truck, Map, ShoppingBag, RefreshCw, 
+  Edit, Bike, Activity, Layers, Factory, Scan, Users, Eye, Terminal
 } from 'lucide-react';
-import { generateMenuDescription, generateRestaurantLogo, sendMessageToBot, parseOrderFromChat, initChatSession } from '../services/gemini';
-import { syncItem, getSettings, saveSettings, DBSettings, fetchOrders, updateOrderStatus, fetchAdmins, addAdmin, removeAdmin, fetchAgents, saveAgent, deleteAgent, fetchAnalyticsMetrics, fetchSystemLogs, generateWhatsAppApprovalMessage, getBotSettings, saveBotSettings, BotSettings, createOrder, COUNTRY_CODES, getInventoryAnalytics, fetchSuppliers, fetchPurchaseOrders, createPurchaseOrder, updatePurchaseOrder, receivePurchaseOrder, getInventoryTransactions, performCycleCount, autoAssignAgent } from '../services/menuRepository';
+import { generateMenuDescription, generateRestaurantLogo, sendMessageToBot, initChatSession } from '../services/gemini';
+import { syncItem, getSettings, saveSettings, DBSettings, fetchOrders, updateOrderStatus, fetchAdmins, fetchAgents, saveAgent, fetchAnalyticsMetrics, fetchSystemLogs, generateWhatsAppApprovalMessage, getBotSettings, saveBotSettings, BotSettings, createOrder, getInventoryAnalytics, fetchSuppliers, fetchPurchaseOrders, createPurchaseOrder, updatePurchaseOrder, receivePurchaseOrder, getInventoryTransactions, performCycleCount } from '../services/menuRepository';
 import { Link } from 'react-router-dom';
 
 interface AdminProps {
@@ -62,10 +60,7 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
   // Advanced Filters
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
-  const [filterDateStart, setFilterDateStart] = useState<string>('');
-  const [filterDateEnd, setFilterDateEnd] = useState<string>('');
   const [filterCustomer, setFilterCustomer] = useState<string>('');
-  const [filterPayment, setFilterPayment] = useState<string>('all');
 
   // POS State
   const [posCart, setPosCart] = useState<CartItem[]>([]);
@@ -83,7 +78,6 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
 
   // Admin Database State
   const [admins, setAdmins] = useState<AdminUser[]>([]);
-  const [newAdmin, setNewAdmin] = useState<{name: string, email: string, role: string}>({ name: '', email: '', role: 'staff' });
 
   // Monitoring & Sandbox State
   const [metrics, setMetrics] = useState<AnalyticsMetrics | null>(null);
@@ -193,7 +187,6 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
           }
       });
 
-      // Create POs
       Object.keys(supplierGroups).forEach(supId => {
           const items = supplierGroups[supId];
           const totalCost = items.reduce((acc: number, i: any) => acc + (i.quantityOrdered * i.costPrice), 0);
@@ -259,7 +252,6 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
       setCycleCountReason(prev => { const n = {...prev}; delete n[itemId]; return n; });
       alert("Inventory adjustment recorded.");
   };
-
 
   // --- POS HANDLERS ---
   const addToPosCart = (item: MenuItem) => {
@@ -329,22 +321,6 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
   };
 
   // --- GENERAL HANDLERS ---
-  const handleStockUpdate = async (item: MenuItem, newStock: number) => {
-      if (newStock < 0) return;
-      setSavingId(item.id);
-      try {
-          const updated = { ...item, stock: newStock, available: newStock > 0 };
-          await syncItem('update', updated);
-          await refreshMenu();
-      } catch (e) { console.error(e); } finally { setSavingId(null); }
-  };
-
-  const handleAvailabilityToggle = async (item: MenuItem) => {
-      const updated = { ...item, available: !item.available };
-      await syncItem('update', updated);
-      await refreshMenu();
-  };
-
   const handleGenerateDesc = async () => {
     if (!newItem.name) return;
     setIsGenerating(true);
@@ -415,20 +391,15 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
       const statusMatch = filterStatus === 'all' || order.status === filterStatus;
       const typeMatch = filterType === 'all' || order.type === filterType;
       
-      const orderDate = new Date(order.timestamp).setHours(0,0,0,0);
-      const startDate = filterDateStart ? new Date(filterDateStart).setHours(0,0,0,0) : null;
-      const endDate = filterDateEnd ? new Date(filterDateEnd).setHours(0,0,0,0) : null;
-      
-      const dateMatch = (!startDate || orderDate >= startDate) && (!endDate || orderDate <= endDate);
-      const customerMatch = filterCustomer === '' || order.customerName.toLowerCase().includes(filterCustomer.toLowerCase()) || order.phoneNumber.includes(filterCustomer);
-      const paymentMatch = filterPayment === 'all' || order.paymentMethod === filterPayment;
+      const customerMatch = filterCustomer === '' || 
+                            order.customerName.toLowerCase().includes(filterCustomer.toLowerCase()) || 
+                            order.id.toLowerCase().includes(filterCustomer.toLowerCase()) ||
+                            order.phoneNumber.includes(filterCustomer);
 
-      return statusMatch && typeMatch && dateMatch && customerMatch && paymentMatch;
+      return statusMatch && typeMatch && customerMatch;
   });
 
-  // Helper to position agents on the mock map
   const getMapPosition = (lat: number, lng: number) => {
-    // Map Center (Downtown Dubai)
     const centerLat = fleetMapCenter.lat;
     const centerLng = fleetMapCenter.lng;
     const scalar = 1500; 
@@ -463,7 +434,6 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
     }
   };
 
-  // Sandbox Chat
   const handleSandboxSend = async () => {
     if (!sandboxInput.trim()) return;
     const userMsg: ChatMessage = { id: Date.now().toString(), sender: 'user', text: sandboxInput, timestamp: new Date() };
@@ -528,7 +498,6 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        {/* Header with Exit Button */}
         <header className="bg-white h-16 border-b border-stone-200 flex items-center justify-between px-6 shrink-0 z-10">
            <div className="flex items-center gap-4">
                <h1 className="text-xl font-bold text-stone-800 capitalize flex items-center gap-2">
@@ -549,9 +518,151 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
            </div>
         </header>
 
-        {/* Content Body */}
         <div className="flex-1 overflow-y-auto bg-stone-50 p-6 relative custom-scrollbar">
            
+           {/* --- ORDER MANAGER --- */}
+           {activeTab === 'orders' && (
+              <div className="max-w-7xl mx-auto space-y-6">
+                 {/* Filters */}
+                 <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-200 flex flex-wrap gap-4 items-end">
+                    <div className="flex-1 min-w-[200px]">
+                        <label className="text-xs font-bold text-stone-500 uppercase mb-1 block">Search Order</label>
+                        <div className="relative">
+                            <Search size={16} className="absolute left-3 top-3 text-stone-400"/>
+                            <input 
+                                type="text"
+                                className="w-full p-2.5 pl-10 border border-stone-200 rounded-lg text-sm bg-stone-50 focus:bg-white focus:ring-2 focus:ring-orange-200 outline-none"
+                                placeholder="Customer name, ID or Phone..."
+                                value={filterCustomer}
+                                onChange={e => setFilterCustomer(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="min-w-[160px]">
+                        <label className="text-xs font-bold text-stone-500 uppercase mb-1 block">Status</label>
+                        <select 
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                            className="w-full p-2.5 border border-stone-200 rounded-lg text-sm bg-stone-50 focus:bg-white outline-none cursor-pointer"
+                        >
+                            <option value="all">All Statuses</option>
+                            <option value="pending_approval">Pending Approval</option>
+                            <option value="approved">Approved</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+
+                    <div className="min-w-[160px]">
+                         <label className="text-xs font-bold text-stone-500 uppercase mb-1 block">Order Type</label>
+                         <select 
+                            value={filterType}
+                            onChange={(e) => setFilterType(e.target.value)}
+                            className="w-full p-2.5 border border-stone-200 rounded-lg text-sm bg-stone-50 focus:bg-white outline-none cursor-pointer"
+                        >
+                            <option value="all">All Types</option>
+                            <option value="delivery">Delivery</option>
+                            <option value="pickup">Pickup</option>
+                            <option value="dine-in">Dine-in</option>
+                        </select>
+                    </div>
+                    
+                    <button onClick={() => { setFilterStatus('all'); setFilterType('all'); setFilterCustomer(''); }} className="p-2.5 text-stone-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Reset Filters">
+                        <RefreshCw size={18} />
+                    </button>
+                 </div>
+
+                 {/* Stats */}
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                     <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-200">
+                         <p className="text-xs font-bold text-stone-400 uppercase">Pending</p>
+                         <p className="text-2xl font-bold text-orange-600">{orders.filter(o => o.status === 'pending_approval').length}</p>
+                     </div>
+                     <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-200">
+                         <p className="text-xs font-bold text-stone-400 uppercase">Active</p>
+                         <p className="text-2xl font-bold text-blue-600">{orders.filter(o => o.status === 'approved').length}</p>
+                     </div>
+                     <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-200">
+                         <p className="text-xs font-bold text-stone-400 uppercase">Completed</p>
+                         <p className="text-2xl font-bold text-green-600">{orders.filter(o => o.status === 'completed').length}</p>
+                     </div>
+                     <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-200">
+                         <p className="text-xs font-bold text-stone-400 uppercase">Revenue (Est)</p>
+                         <p className="text-2xl font-bold text-stone-800">${orders.reduce((acc, o) => acc + (o.status !== 'cancelled' ? o.total : 0), 0).toFixed(0)}</p>
+                     </div>
+                 </div>
+
+                 {/* Order List */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {filteredOrders.length === 0 && (
+                        <div className="col-span-full py-20 text-center text-stone-400">
+                            <ClipboardList size={48} className="mx-auto mb-4 opacity-20"/>
+                            <p className="font-bold">No orders found matching filters.</p>
+                        </div>
+                    )}
+                    {filteredOrders.map(order => (
+                        <div key={order.id} className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden hover:shadow-md transition group">
+                            <div className={`px-5 py-4 border-b border-stone-100 flex justify-between items-center ${order.status === 'pending_approval' ? 'bg-orange-50' : order.status === 'completed' ? 'bg-stone-50' : 'bg-white'}`}>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-stone-800">#{order.id.slice(-6)}</span>
+                                    {order.status === 'pending_approval' && <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>}
+                                </div>
+                                <span className="text-[10px] font-bold uppercase text-stone-400">{new Date(order.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            </div>
+                            
+                            <div className="p-5">
+                                <div className="flex justify-between mb-4">
+                                    <div>
+                                        <h4 className="font-bold text-stone-900">{order.customerName}</h4>
+                                        <p className="text-xs text-stone-500 flex items-center gap-1">
+                                            {order.type === 'delivery' ? <Bike size={12}/> : <ShoppingBag size={12}/>} 
+                                            {order.type.toUpperCase()}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-bold text-lg text-orange-600">${order.total.toFixed(2)}</p>
+                                        <p className="text-[10px] text-stone-400 uppercase">{order.paymentMethod}</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-stone-50 p-3 rounded-lg mb-4 text-xs text-stone-600 space-y-1">
+                                    {order.items.slice(0, 3).map((item, i) => (
+                                        <div key={i} className="flex justify-between">
+                                            <span>{item.quantity}x {item.name}</span>
+                                        </div>
+                                    ))}
+                                    {order.items.length > 3 && <div className="text-stone-400 italic">+{order.items.length - 3} more items...</div>}
+                                </div>
+
+                                <div className="flex gap-2 items-center">
+                                     <Link to={`/admin/orders/${order.id}`} className="flex-1 py-2 text-center text-xs font-bold border border-stone-200 rounded-lg hover:bg-stone-50 text-stone-600 transition">
+                                         Details
+                                     </Link>
+                                     {order.status === 'pending_approval' ? (
+                                        <>
+                                            <button onClick={() => handleOrderStatus(order.id, 'cancelled')} className="p-2 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg border border-red-100"><Trash2 size={16}/></button>
+                                            <button onClick={() => handleOrderStatus(order.id, 'approved')} className="flex-1 py-2 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-lg shadow-sm flex items-center justify-center gap-1">
+                                                <Check size={14}/> Approve
+                                            </button>
+                                        </>
+                                     ) : (
+                                        <span className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase border ${
+                                            order.status === 'completed' ? 'bg-stone-100 text-stone-500 border-stone-200' :
+                                            order.status === 'cancelled' ? 'bg-red-50 text-red-500 border-red-100' :
+                                            'bg-blue-50 text-blue-600 border-blue-100'
+                                        }`}>
+                                            {order.status.replace('_', ' ')}
+                                        </span>
+                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                 </div>
+              </div>
+           )}
+
            {/* --- MENU MANAGER --- */}
            {activeTab === 'menu' && (
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-full">
@@ -728,10 +839,8 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
            {/* --- FLEET MAP --- */}
            {activeTab === 'fleet' && (
               <div className="h-full bg-stone-200 rounded-2xl border border-stone-300 relative overflow-hidden shadow-inner group">
-                  {/* Map Background */}
                   <div className="absolute inset-0 bg-[url('https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/13/5286/3427.png')] bg-cover opacity-60"></div>
                   
-                  {/* Restaurant Marker */}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
                        <div className="w-16 h-16 bg-stone-900 rounded-full border-4 border-white shadow-2xl flex items-center justify-center text-white animate-bounce">
                            <UtensilsCrossed size={24} />
@@ -739,7 +848,6 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
                        <div className="bg-white px-3 py-1 rounded-full shadow-md text-xs font-bold mt-1">HQ</div>
                   </div>
 
-                  {/* Agents */}
                   {agents.map(agent => {
                       const pos = getMapPosition(agent.currentLat, agent.currentLng);
                       return (
@@ -761,7 +869,6 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
                       );
                   })}
                   
-                  {/* Map Controls Overlay */}
                   <div className="absolute top-4 right-4 bg-white/90 backdrop-blur p-4 rounded-2xl shadow-xl border border-stone-200 w-64">
                       <h3 className="font-bold text-stone-800 mb-2 flex items-center gap-2"><Map size={16}/> Live Fleet</h3>
                       <div className="space-y-2">
@@ -828,12 +935,11 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
            )}
            
            {/* Placeholder for other tabs (Simple Render) */}
-           {['dashboard', 'orders', 'inventory', 'fulfillment', 'pos', 'admins', 'monitoring', 'sandbox', 'settings'].includes(activeTab) && (
+           {['dashboard', 'inventory', 'fulfillment', 'pos', 'admins', 'monitoring', 'sandbox', 'settings'].includes(activeTab) && (
                <div className="bg-white p-10 rounded-2xl shadow-sm border border-stone-200 text-center">
                    <h2 className="text-2xl font-bold text-stone-300 mb-4 uppercase tracking-widest">{activeTab}</h2>
                    <p className="text-stone-500">
                        This module is active. Check specific implementation files for detailed logic.
-                       {activeTab === 'orders' && ` (${orders.length} orders loaded)`}
                    </p>
                </div>
            )}
