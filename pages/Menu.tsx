@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MenuItem, Review, CartItem, OrderType, Order } from '../types';
-import { ShoppingCart, Star, ChevronDown, ChevronUp, Send, User, Search, Trash2, CreditCard, Bike, ShoppingBag, Utensils, X, MessageCircle, Phone, ShieldCheck, Lock, Info, Flame, Wheat, FileText, CheckCircle, Banknote, Link as LinkIcon, Loader2, Filter } from 'lucide-react';
+import { ShoppingCart, Star, ChevronDown, ChevronUp, Send, User, Search, Trash2, CreditCard, Bike, ShoppingBag, Utensils, X, MessageCircle, Phone, ShieldCheck, Lock, Info, Flame, Wheat, FileText, CheckCircle, Banknote, Link as LinkIcon, Loader2, Filter, Store, MapPin } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { createOrder, generateWhatsAppOrderMessage, COUNTRY_CODES } from '../services/menuRepository';
@@ -35,7 +35,7 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
   
   // Cart & Order State
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [orderType, setOrderType] = useState<OrderType>('dine-in');
+  const [orderType, setOrderType] = useState<OrderType>('dine-in'); // Default to dine-in
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'online_link'>('cash');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
@@ -564,6 +564,29 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
                                 </div>
                             ) : (
                                 <div className="space-y-4">
+                                    
+                                    {/* Order Type Selector */}
+                                    <div className="bg-white p-1 rounded-xl border border-stone-200 shadow-sm flex mb-4 sticky top-0 z-10">
+                                        <button 
+                                            onClick={() => setOrderType('dine-in')}
+                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 ${orderType === 'dine-in' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:bg-stone-50'}`}
+                                        >
+                                            <Utensils size={14}/> Dine-In
+                                        </button>
+                                        <button 
+                                            onClick={() => setOrderType('pickup')}
+                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 ${orderType === 'pickup' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:bg-stone-50'}`}
+                                        >
+                                            <Store size={14}/> Pickup
+                                        </button>
+                                        <button 
+                                            onClick={() => setOrderType('delivery')}
+                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 ${orderType === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:bg-stone-50'}`}
+                                        >
+                                            <Bike size={14}/> Delivery
+                                        </button>
+                                    </div>
+
                                     {cart.map(item => (
                                         <div key={item.id} className="flex gap-4 items-center bg-white p-3 rounded-xl border border-stone-100 shadow-sm">
                                             <div className="relative">
@@ -613,6 +636,12 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
                                                     onChange={e => setCustomerPhone(e.target.value)}
                                                 />
                                             </div>
+                                            {orderType === 'delivery' && (
+                                                <div className="flex items-center gap-2 bg-stone-50 p-2 rounded border border-stone-200">
+                                                    <MapPin size={16} className="text-stone-400" />
+                                                    <span className="text-xs text-stone-500 italic">Downtown Dubai, UAE (Default)</span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -622,31 +651,7 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
                         {cart.length > 0 && (
                             <div className="p-6 border-t border-stone-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] shrink-0 z-20 overflow-y-auto max-h-[50vh]">
                                 
-                                {/* Order Type Selector - Moved Here */}
-                                <div className="mb-4">
-                                    <div className="flex bg-stone-100 p-1 rounded-xl">
-                                        <button 
-                                            onClick={() => setOrderType('dine-in')}
-                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${orderType === 'dine-in' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
-                                        >
-                                            Dine-In
-                                        </button>
-                                        <button 
-                                            onClick={() => setOrderType('delivery')}
-                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${orderType === 'delivery' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
-                                        >
-                                            Delivery
-                                        </button>
-                                        <button 
-                                            onClick={() => setOrderType('pickup')}
-                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${orderType === 'pickup' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
-                                        >
-                                            Pickup
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Payment Method - Moved Here */}
+                                {/* Payment Method */}
                                 <div className="mb-4">
                                     <h3 className="font-bold text-xs text-stone-500 uppercase mb-2">Payment</h3>
                                     <div className="flex gap-2">
@@ -673,9 +678,9 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
                                         <span>${tax.toFixed(2)}</span>
                                     </div>
                                     {orderType === 'delivery' && (
-                                        <div className="flex justify-between text-orange-600 text-xs font-bold bg-orange-50 px-2 py-1 rounded">
+                                        <div className="flex justify-between text-stone-800 text-xs font-bold bg-stone-100 px-2 py-1 rounded">
                                             <span>Delivery Fee</span>
-                                            <span>${deliveryCharge.toFixed(2)}</span>
+                                            <span>${DELIVERY_FEE.toFixed(2)}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between items-center pt-2 border-t border-stone-100">
