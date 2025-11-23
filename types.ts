@@ -1,5 +1,6 @@
 
 
+
 export interface MenuItem {
   id: string;
   name: string;
@@ -85,7 +86,7 @@ export interface AdminUser {
   id: string;
   name: string;
   email: string;
-  role: 'super_admin' | 'manager' | 'staff';
+  role: 'super_admin' | 'manager' | 'staff' | 'Sales manager' | 'Delivery agents';
   status: 'active' | 'inactive';
   lastLogin: string;
 }

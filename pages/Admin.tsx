@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem, Order, DeliveryAgent, AdminUser, AnalyticsMetrics, SystemLog, ChatMessage, CartItem, OrderType, InventoryForecast, Supplier, PurchaseOrder, InventoryTransaction } from '../types';
 import { 
@@ -143,7 +141,7 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
              }));
         }
 
-    }, 10000); 
+    }, 2000); // Faster update rate for GPS feel
 
     return () => clearInterval(interval);
   }, [menu, lastOrderCount, activeTab]);
@@ -1120,8 +1118,154 @@ const Admin: React.FC<AdminProps> = ({ menu, refreshMenu }) => {
                     </div>
                 )}
                 
+                {activeTab === 'fleet' && (
+                    <div className="h-full flex flex-col animate-in fade-in">
+                        {/* Header and Map/List Layout */}
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
+                                    <Truck className="text-orange-600"/> Fleet Management
+                                </h2>
+                                <p className="text-stone-500 text-sm">Real-time GPS tracking and agent assignment.</p>
+                            </div>
+                            <button onClick={handleAddAgent} className="bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-stone-800">
+                                <Plus size={16}/> Add New Agent
+                            </button>
+                        </div>
+
+                        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
+                            {/* AGENT LIST */}
+                            <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden flex flex-col">
+                                <div className="p-4 border-b border-stone-100 bg-stone-50">
+                                    <h3 className="font-bold text-stone-700 text-sm">Delivery Agents ({agents.length})</h3>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                                    {agents.map(agent => (
+                                        <div 
+                                            key={agent.id} 
+                                            onClick={() => setSelectedMapAgent(agent)}
+                                            className={`p-3 rounded-lg border cursor-pointer transition flex justify-between items-center ${selectedMapAgent?.id === agent.id ? 'bg-orange-50 border-orange-200 shadow-sm' : 'bg-white border-stone-100 hover:border-stone-300'}`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-2 h-2 rounded-full ${agent.status === 'available' ? 'bg-green-500' : agent.status === 'busy' ? 'bg-orange-500' : 'bg-stone-300'}`} />
+                                                <div>
+                                                    <p className="font-bold text-stone-800 text-sm">{agent.name}</p>
+                                                    <p className="text-xs text-stone-400">{agent.phone}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={(e) => { e.stopPropagation(); handleEditAgent(agent); }} className="p-1.5 hover:bg-stone-100 rounded text-stone-500"><Pencil size={14}/></button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteAgent(agent.id); }} className="p-1.5 hover:bg-red-50 rounded text-red-500"><Trash2 size={14}/></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* LIVE MAP */}
+                            <div className="lg:col-span-2 bg-stone-200 rounded-xl border border-stone-300 overflow-hidden relative shadow-inner">
+                                {/* Map Background Layers */}
+                                <div className="absolute inset-0 bg-[url('https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/13/5286/3427.png')] bg-cover opacity-80 mix-blend-multiply"></div>
+                                <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.05)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+
+                                {/* Markers */}
+                                {agents.map(agent => {
+                                    const pos = getMapPosition(agent.currentLat, agent.currentLng);
+                                    return (
+                                        <div 
+                                            key={agent.id}
+                                            className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group transition-all duration-700 ease-linear"
+                                            style={{ left: pos.left, top: pos.top }}
+                                            onClick={() => setSelectedMapAgent(agent)}
+                                        >
+                                            {/* Ping Animation for Active Agents */}
+                                            {agent.status !== 'offline' && (
+                                                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full animate-ping opacity-30 ${agent.status === 'available' ? 'bg-green-500' : 'bg-orange-500'}`}></div>
+                                            )}
+                                            
+                                            {/* Icon */}
+                                            <div className={`w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white transition-transform hover:scale-110 ${agent.status === 'available' ? 'bg-green-600' : agent.status === 'busy' ? 'bg-orange-600' : 'bg-stone-500'}`}>
+                                                <Bike size={14} />
+                                            </div>
+
+                                            {/* Tooltip */}
+                                            <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-stone-900 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap transition-opacity ${selectedMapAgent?.id === agent.id ? 'opacity-100 z-10' : 'opacity-0 group-hover:opacity-100'}`}>
+                                                {agent.name}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {/* HQ Marker */}
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+                                    <div className="w-4 h-4 bg-stone-900 rounded-full border-2 border-white shadow-xl"></div>
+                                    <span className="text-[10px] font-bold text-stone-800 bg-white/80 px-1 rounded mt-1">HQ</span>
+                                </div>
+
+                                {/* Info Overlay */}
+                                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur p-3 rounded-xl shadow-sm text-xs border border-stone-200">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="w-2 h-2 bg-green-500 rounded-full"></span> Available
+                                    </div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="w-2 h-2 bg-orange-500 rounded-full"></span> Busy
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-stone-400 rounded-full"></span> Offline
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal for Add/Edit Agent */}
+                        {isAgentModalOpen && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                                <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-in fade-in zoom-in-95">
+                                    <h3 className="font-bold text-lg mb-4">{currentAgent.id ? 'Edit Agent' : 'Add New Agent'}</h3>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-xs font-bold text-stone-500 uppercase">Name</label>
+                                            <input 
+                                                type="text" 
+                                                className="w-full p-2 border border-stone-200 rounded-lg"
+                                                value={currentAgent.name || ''}
+                                                onChange={e => setCurrentAgent({...currentAgent, name: e.target.value})}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-stone-500 uppercase">Phone</label>
+                                            <input 
+                                                type="text" 
+                                                className="w-full p-2 border border-stone-200 rounded-lg"
+                                                value={currentAgent.phone || ''}
+                                                onChange={e => setCurrentAgent({...currentAgent, phone: e.target.value})}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-stone-500 uppercase">Status</label>
+                                            <select 
+                                                className="w-full p-2 border border-stone-200 rounded-lg"
+                                                value={currentAgent.status || 'available'}
+                                                onChange={e => setCurrentAgent({...currentAgent, status: e.target.value as any})}
+                                            >
+                                                <option value="available">Available</option>
+                                                <option value="busy">Busy</option>
+                                                <option value="offline">Offline</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 mt-6">
+                                        <button onClick={() => setIsAgentModalOpen(false)} className="flex-1 py-2 text-stone-500 font-bold hover:bg-stone-50 rounded-lg">Cancel</button>
+                                        <button onClick={handleSaveAgent} className="flex-1 py-2 bg-stone-900 text-white font-bold rounded-lg hover:bg-stone-800">Save</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+                
                 {/* Fallback for un-implemented tabs */}
-                {(activeTab === 'menu' || activeTab === 'orders' || activeTab === 'admins' || activeTab === 'branding' || activeTab === 'settings' || activeTab === 'fleet' || activeTab === 'monitoring' || activeTab === 'sandbox' || activeTab === 'pos') && (
+                {(activeTab === 'menu' || activeTab === 'orders' || activeTab === 'admins' || activeTab === 'branding' || activeTab === 'settings' || activeTab === 'monitoring' || activeTab === 'sandbox' || activeTab === 'pos') && (
                         <div className="flex flex-col items-center justify-center h-full text-stone-400">
                         <Wand2 size={48} className="mb-4 opacity-20"/>
                         <h3 className="text-lg font-bold">Tab Content Unavailable</h3>

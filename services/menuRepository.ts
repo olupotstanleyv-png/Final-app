@@ -303,13 +303,18 @@ export const syncItem = async (action: 'add' | 'update' | 'delete', item?: MenuI
   if (action === 'delete' && id) {
     newMenu = newMenu.filter(i => i.id !== id);
   } else if (action === 'add' && item) {
+    // Force availability based on stock
+    item.available = item.stock > 0;
     newMenu.push(item);
   } else if (action === 'update' && item) {
-    // If stock changed manually, log adjustment (basic check)
     const oldItem = newMenu.find(i => i.id === item.id);
     if (oldItem && oldItem.stock !== item.stock) {
         logInventoryTransaction(item.id, item.name, 'adjustment', item.stock - oldItem.stock, 'Manual Admin Update');
     }
+    
+    // Force availability based on stock
+    item.available = item.stock > 0;
+    
     newMenu = newMenu.map(i => i.id === item.id ? item : i);
   }
 
@@ -474,6 +479,8 @@ export const performCycleCount = async (itemId: string, actualCount: number, rea
     if (diff === 0) return;
 
     item.stock = actualCount;
+    item.available = actualCount > 0; // Ensure availability reflects stock
+    
     // Log Adjustment
     logInventoryTransaction(item.id, item.name, 'adjustment', diff, reason);
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MenuItem, Review, CartItem, OrderType, Order } from '../types';
-import { ShoppingCart, Star, ChevronDown, ChevronUp, Send, User, Search, Trash2, CreditCard, Bike, ShoppingBag, Utensils, X, MessageCircle, Phone, ShieldCheck, Lock, Info, Flame, Wheat, FileText, CheckCircle, Banknote, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { ShoppingCart, Star, ChevronDown, ChevronUp, Send, User, Search, Trash2, CreditCard, Bike, ShoppingBag, Utensils, X, MessageCircle, Phone, ShieldCheck, Lock, Info, Flame, Wheat, FileText, CheckCircle, Banknote, Link as LinkIcon, Loader2, Filter } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { createOrder, generateWhatsAppOrderMessage, COUNTRY_CODES } from '../services/menuRepository';
@@ -254,6 +254,7 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
 
       {/* Controls */}
       <div className="flex flex-col gap-6 mb-12 max-w-6xl mx-auto">
+        {/* Search Bar */}
         <div className="relative w-full max-w-md mx-auto">
             <Search className="absolute left-4 top-3.5 text-stone-400" size={20} />
             <input 
@@ -264,35 +265,67 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
                 className="w-full pl-12 pr-6 py-3.5 rounded-full border border-stone-200 bg-white text-stone-700 focus:ring-2 focus:ring-orange-200 outline-none transition font-medium shadow-sm"
             />
         </div>
-        <div className="flex flex-wrap justify-center gap-2 md:gap-4">
-             <button
-                onClick={() => handleCategoryChange(t('menu_category_all'))}
-                className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-300 border ${
-                   activeCat === t('menu_category_all') || activeCat === 'All'
-                   ? 'bg-orange-600 text-white border-orange-600 shadow-lg transform scale-105'
-                   : 'bg-white text-stone-600 border-stone-200 hover:border-orange-300 hover:text-orange-600 hover:shadow-sm'
-                }`}
-             >
-                {t('menu_category_all')}
-             </button>
-             {uniqueCategories.map((cat: string) => (
-                <button
-                   key={cat}
-                   onClick={() => handleCategoryChange(cat)}
-                   className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-300 border ${
-                      activeCat === cat
-                      ? 'bg-orange-600 text-white border-orange-600 shadow-lg transform scale-105'
-                      : 'bg-white text-stone-600 border-stone-200 hover:border-orange-300 hover:text-orange-600 hover:shadow-sm'
-                   }`}
+
+        {/* Category Controls */}
+        <div className="flex justify-center w-full">
+            
+            {/* Mobile Dropdown (Visible only on small screens) */}
+            <div className="relative w-full max-w-xs md:hidden">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500 pointer-events-none">
+                    <Filter size={16} />
+                </div>
+                <select 
+                    value={activeCat}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
+                    className="w-full appearance-none bg-white border border-stone-200 text-stone-700 py-3 pl-10 pr-10 rounded-full font-bold text-sm focus:outline-none focus:ring-2 focus:ring-orange-200 shadow-sm cursor-pointer"
                 >
-                   {cat}
+                    <option value={t('menu_category_all')}>{t('menu_category_all')}</option>
+                    {uniqueCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" size={16} />
+            </div>
+
+            {/* Desktop Pills (Visible only on medium+ screens) */}
+            <div className="hidden md:flex flex-wrap justify-center gap-2 md:gap-4">
+                <button
+                    onClick={() => handleCategoryChange(t('menu_category_all'))}
+                    className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-300 border ${
+                    activeCat === t('menu_category_all') || activeCat === 'All'
+                    ? 'bg-orange-600 text-white border-orange-600 shadow-lg transform scale-105'
+                    : 'bg-white text-stone-600 border-stone-200 hover:border-orange-300 hover:text-orange-600 hover:shadow-sm'
+                    }`}
+                >
+                    {t('menu_category_all')}
                 </button>
-             ))}
+                {uniqueCategories.map((cat: string) => (
+                    <button
+                    key={cat}
+                    onClick={() => handleCategoryChange(cat)}
+                    className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-300 border ${
+                        activeCat === cat
+                        ? 'bg-orange-600 text-white border-orange-600 shadow-lg transform scale-105'
+                        : 'bg-white text-stone-600 border-stone-200 hover:border-orange-300 hover:text-orange-600 hover:shadow-sm'
+                    }`}
+                    >
+                    {cat}
+                    </button>
+                ))}
+            </div>
         </div>
       </div>
 
       {/* Menu Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {filteredMenu.length === 0 && (
+            <div className="col-span-full text-center py-20 opacity-50">
+                <Utensils size={48} className="mx-auto mb-4 text-stone-300"/>
+                <p className="text-xl font-bold text-stone-400">{t('menu_no_items')}</p>
+                <button onClick={() => {setSearchTerm(''); handleCategoryChange(t('menu_category_all'));}} className="mt-4 text-orange-600 font-bold hover:underline">Clear Filters</button>
+            </div>
+        )}
+
         {filteredMenu.map(item => {
             const itemReviews: Review[] = reviews[item.id] || [];
             const avgRating = itemReviews.length > 0 
