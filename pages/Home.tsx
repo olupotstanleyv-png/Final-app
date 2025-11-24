@@ -24,66 +24,66 @@ const Home: React.FC = () => {
 
   return (
     <div>
-      {/* Hero Section - Light Blue Theme */}
-      <div className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden bg-sky-50">
+      {/* Hero Section - Premium Dark Theme */}
+      <div className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden bg-stone-950">
         
-        {/* Background Slider - Low Opacity to blend with light theme */}
+        {/* Background Slider - Balanced Opacity for Dark Theme */}
         {BACKGROUND_IMAGES.map((img, index) => (
           <div 
             key={index}
             className={`absolute inset-0 bg-cover bg-center transition-opacity duration-[2000ms] ease-in-out ${
-              index === bgIndex ? 'opacity-30' : 'opacity-0'
+              index === bgIndex ? 'opacity-40' : 'opacity-0'
             }`}
             style={{ backgroundImage: `url('${img}')` }}
           />
         ))}
 
-        {/* Light Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-sky-50/80 via-sky-50/50 to-sky-50/90 z-10"></div>
+        {/* Luxury Dark Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-stone-950/80 via-stone-950/50 to-stone-950 z-10"></div>
         
         <div className="relative z-20 max-w-5xl mx-auto px-6 text-center mt-10">
           
           {/* Headline: Clear Value Prop */}
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[0.95] animate-in fade-in slide-in-from-bottom-6 delay-100 text-slate-900">
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[0.95] animate-in fade-in slide-in-from-bottom-6 delay-100 text-white drop-shadow-lg">
              {t('hero_headline_prefix')} <br/>
-             <span className="text-transparent bg-clip-text bg-gradient-to-br from-blue-600 via-sky-500 to-teal-400">{t('hero_headline_highlight')}</span>
+             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-400 filter drop-shadow-sm">{t('hero_headline_highlight')}</span>
           </h1>
 
           {/* Subheadline: Why Buy? */}
-          <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed font-light animate-in fade-in slide-in-from-bottom-6 delay-200">
+          <p className="text-lg md:text-xl text-stone-300 max-w-2xl mx-auto mb-10 leading-relaxed font-light animate-in fade-in slide-in-from-bottom-6 delay-200">
              {t('hero_description')}
           </p>
           
-          {/* Scannable Key Benefits */}
-          <div className="mt-16 pt-10 border-t border-slate-200 grid grid-cols-3 gap-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-10 delay-500">
+          {/* Scannable Key Benefits - Glassmorphism */}
+          <div className="mt-16 pt-10 border-t border-stone-800 grid grid-cols-3 gap-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-10 delay-500">
               <div className="flex flex-col items-center group">
-                 <div className="mb-3 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm group-hover:border-blue-500/50 transition-colors">
-                     <ChefHat size={24} className="text-blue-600" />
+                 <div className="mb-3 p-3 bg-stone-900/60 backdrop-blur-md rounded-2xl border border-stone-800 shadow-lg group-hover:border-orange-500/50 transition-colors">
+                     <ChefHat size={24} className="text-orange-500" />
                  </div>
-                 <h3 className="font-bold text-sm md:text-base text-slate-800">{t('benefit_chef')}</h3>
-                 <p className="text-xs text-slate-500 mt-1 hidden md:block">{t('benefit_chef_desc')}</p>
+                 <h3 className="font-bold text-sm md:text-base text-stone-200">{t('benefit_chef')}</h3>
+                 <p className="text-xs text-stone-500 mt-1 hidden md:block">{t('benefit_chef_desc')}</p>
               </div>
               
               <div className="flex flex-col items-center group">
-                 <div className="mb-3 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm group-hover:border-green-500/50 transition-colors">
-                     <Clock size={24} className="text-green-600" />
+                 <div className="mb-3 p-3 bg-stone-900/60 backdrop-blur-md rounded-2xl border border-stone-800 shadow-lg group-hover:border-green-500/50 transition-colors">
+                     <Clock size={24} className="text-emerald-400" />
                  </div>
-                 <h3 className="font-bold text-sm md:text-base text-slate-800">{t('benefit_instant')}</h3>
-                 <p className="text-xs text-slate-500 mt-1 hidden md:block">{t('benefit_instant_desc')}</p>
+                 <h3 className="font-bold text-sm md:text-base text-stone-200">{t('benefit_instant')}</h3>
+                 <p className="text-xs text-stone-500 mt-1 hidden md:block">{t('benefit_instant_desc')}</p>
               </div>
               
               <div className="flex flex-col items-center group">
-                 <div className="mb-3 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm group-hover:border-purple-500/50 transition-colors">
-                     <ShieldCheck size={24} className="text-purple-600" />
+                 <div className="mb-3 p-3 bg-stone-900/60 backdrop-blur-md rounded-2xl border border-stone-800 shadow-lg group-hover:border-amber-500/50 transition-colors">
+                     <ShieldCheck size={24} className="text-amber-400" />
                  </div>
-                 <h3 className="font-bold text-sm md:text-base text-slate-800">{t('benefit_secure')}</h3>
-                 <p className="text-xs text-slate-500 mt-1 hidden md:block">{t('benefit_secure_desc')}</p>
+                 <h3 className="font-bold text-sm md:text-base text-stone-200">{t('benefit_secure')}</h3>
+                 <p className="text-xs text-stone-500 mt-1 hidden md:block">{t('benefit_secure_desc')}</p>
               </div>
           </div>
         </div>
       </div>
 
-      {/* Features Grid - More Clean & Minimal */}
+      {/* Features Grid - Clean & Minimal */}
       <div className="py-24 bg-white relative z-20">
         <div className="max-w-6xl mx-auto px-6">
             <div className="text-center mb-16">
@@ -92,7 +92,7 @@ const Home: React.FC = () => {
             </div>
 
             <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-                <div className="p-8 rounded-3xl bg-stone-50 border border-stone-100 hover:shadow-xl transition-all duration-300 group flex flex-col items-start text-left">
+                <div className="p-8 rounded-3xl bg-stone-50 border border-stone-100 hover:shadow-xl transition-all duration-300 group flex flex-col items-start text-left hover:border-orange-200">
                     <div className="w-14 h-14 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300">
                         <MessageCircle size={28} />
                     </div>
@@ -106,20 +106,20 @@ const Home: React.FC = () => {
                     </button>
                 </div>
                 
-                <div className="p-8 rounded-3xl bg-stone-50 border border-stone-100 hover:shadow-xl transition-all duration-300 group flex flex-col items-start text-left">
-                    <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300">
+                <div className="p-8 rounded-3xl bg-stone-50 border border-stone-100 hover:shadow-xl transition-all duration-300 group flex flex-col items-start text-left hover:border-stone-300">
+                    <div className="w-14 h-14 bg-stone-200 text-stone-700 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300">
                         <ChefHat size={28} />
                     </div>
                     <h3 className="text-xl font-bold mb-3 text-stone-800">{t('feature_menu_title')}</h3>
                     <p className="text-stone-500 leading-relaxed text-sm mb-4">{t('feature_menu_desc')}</p>
-                    <Link to="/menu" className="mt-auto text-blue-600 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">Browse Menu <ArrowRight size={16}/></Link>
+                    <Link to="/menu" className="mt-auto text-stone-900 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">Browse Menu <ArrowRight size={16}/></Link>
                 </div>
             </div>
         </div>
       </div>
 
       {/* Social Proof / Testimonials */}
-      <div className="bg-stone-50 py-24 border-t border-stone-100">
+      <div className="bg-stone-50 py-24 border-t border-stone-200">
         <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-16">
                 <h2 className="text-3xl md:text-4xl font-bold text-stone-800 mb-4">{t('testimonials_title')}</h2>
@@ -132,9 +132,9 @@ const Home: React.FC = () => {
                     { name: "Michael Chen", role: "Verified Buyer", comment: "Ordering via WhatsApp was so smooth. The food arrived hot and fresh.", rating: 5 },
                     { name: "Emma Wilson", role: "Regular Guest", comment: "Stanley's never disappoints. The AI suggestions were actually spot on!", rating: 4 }
                 ].map((review, i) => (
-                    <div key={i} className="bg-white p-8 rounded-3xl shadow-sm border border-stone-100 relative hover:shadow-md transition duration-300 hover:-translate-y-1">
+                    <div key={i} className="bg-white p-8 rounded-3xl shadow-sm border border-stone-100 relative hover:shadow-lg transition duration-300 hover:-translate-y-1">
                         <Quote size={40} className="absolute top-6 right-6 text-orange-100" />
-                        <div className="flex items-center gap-1 mb-4 text-yellow-400">
+                        <div className="flex items-center gap-1 mb-4 text-amber-400">
                             {[...Array(5)].map((_, idx) => (
                                 <Star key={idx} size={16} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-stone-200"} />
                             ))}
@@ -186,14 +186,14 @@ const Home: React.FC = () => {
         <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
            <h2 className="text-3xl font-bold text-stone-800 mb-12 tracking-tight">{t('operating_title')}</h2>
            <div className="grid md:grid-cols-2 gap-8">
-              <div className="bg-stone-50 p-10 rounded-3xl shadow-sm hover:shadow-xl transition duration-300 flex flex-col items-center border border-stone-200/50">
+              <div className="bg-stone-50 p-10 rounded-3xl shadow-sm hover:shadow-xl transition duration-300 flex flex-col items-center border border-stone-200/50 hover:border-orange-200">
                   <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center text-orange-500 mb-6 transform rotate-3">
                     <Clock size={32} />
                   </div>
                   <h3 className="text-lg font-bold text-stone-900 mb-1">Weekdays</h3>
                   <p className="text-stone-500">{t('operating_week')}</p>
               </div>
-              <div className="bg-stone-50 p-10 rounded-3xl shadow-sm hover:shadow-xl transition duration-300 flex flex-col items-center border border-stone-200/50">
+              <div className="bg-stone-50 p-10 rounded-3xl shadow-sm hover:shadow-xl transition duration-300 flex flex-col items-center border border-stone-200/50 hover:border-orange-200">
                   <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center text-orange-500 mb-6 transform -rotate-3">
                     <Calendar size={32} />
                   </div>
@@ -214,7 +214,7 @@ const Home: React.FC = () => {
                   {/* Column 1: Brand & Lead Capture */}
                   <div className="space-y-6">
                       <Link to="/" className="flex items-center gap-2 text-white group w-fit">
-                          <div className="w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center font-serif font-black text-xl italic shadow-lg group-hover:rotate-6 transition duration-300">S</div>
+                          <div className="w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center font-serif font-black text-xl italic shadow-lg group-hover:rotate-6 transition duration-300 text-stone-900">S</div>
                           <div className="flex flex-col">
                             <span className="font-serif font-bold text-2xl leading-none">Stanley's</span>
                             <span className="text-[10px] uppercase tracking-widest text-stone-500">Fine Dining</span>
@@ -233,7 +233,7 @@ const Home: React.FC = () => {
                                 placeholder="Your email..." 
                                 className="bg-stone-900 border border-stone-800 rounded-lg px-4 py-2 text-sm w-full focus:outline-none focus:border-orange-600 transition"
                               />
-                              <button className="bg-orange-600 text-white p-2 rounded-lg hover:bg-orange-700 transition">
+                              <button className="bg-orange-600 text-stone-900 p-2 rounded-lg hover:bg-orange-700 transition">
                                   <ArrowRight size={18}/>
                               </button>
                           </div>
@@ -299,10 +299,10 @@ const Home: React.FC = () => {
 
                   {/* Social Media */}
                   <div className="flex gap-4">
-                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-white transition"><Facebook size={14}/></a>
-                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-white transition"><Instagram size={14}/></a>
-                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-white transition"><Twitter size={14}/></a>
-                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-white transition"><Linkedin size={14}/></a>
+                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-stone-900 transition"><Facebook size={14}/></a>
+                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-stone-900 transition"><Instagram size={14}/></a>
+                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-stone-900 transition"><Twitter size={14}/></a>
+                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-stone-900 transition"><Linkedin size={14}/></a>
                   </div>
 
                   {/* Payment Methods */}

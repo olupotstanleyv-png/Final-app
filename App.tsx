@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home as HomeIcon, Coffee, Settings, Sparkles, Menu as MenuIcon, Globe, ChevronDown, X, ChefHat, Phone, MessageCircle, Clock, MapPin, Loader2, HelpCircle, Users, Info as InfoIcon, Briefcase, Bell, CheckCircle, Search, ArrowRight, Truck } from 'lucide-react';
@@ -84,100 +85,112 @@ const NavBar: React.FC = () => {
     }
   };
 
-  const isActive = (path: string) => location.pathname === path 
-    ? 'bg-stone-800 text-white shadow-md' 
-    : 'text-stone-300 hover:bg-stone-800 hover:text-white';
+  const isActive = (path: string) => location.pathname === path;
   
   return (
-    <nav className="bg-stone-900 border-b border-stone-800 sticky top-0 z-40 transition-all duration-300 text-white shadow-lg">
+    <nav className="bg-stone-950/80 backdrop-blur-xl border-b border-stone-800 sticky top-0 z-50 transition-all duration-300 text-white shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
+          {/* Logo Section */}
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-11 h-11 bg-gradient-to-br from-orange-600 to-red-600 rounded-xl flex items-center justify-center text-white shadow-lg group-hover:rotate-6 transition-all duration-300">
-                <span className="font-serif font-black text-2xl italic tracking-tighter">S</span>
+            <div className="w-11 h-11 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center text-white shadow-lg group-hover:rotate-6 transition-all duration-300 relative overflow-hidden">
+                <div className="absolute inset-0 bg-black/10"></div>
+                <span className="font-serif font-black text-2xl italic tracking-tighter relative z-10">S</span>
             </div>
             <div className="flex flex-col">
-               <span className="font-serif font-black text-2xl leading-none tracking-tight text-white group-hover:text-orange-500 transition-colors">Stanley's</span>
-               <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-stone-400 group-hover:text-orange-400 transition-colors ml-0.5">Fine Dining</span>
+               <span className="font-serif font-bold text-2xl leading-none tracking-tight text-stone-100 group-hover:text-orange-500 transition-colors">Stanley's</span>
+               <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-stone-500 group-hover:text-orange-400 transition-colors ml-0.5">Fine Dining</span>
             </div>
           </Link>
-          <div className="hidden md:flex items-center gap-3 font-medium text-sm">
-            <Link to="/" className={`px-4 py-2 rounded-full transition-all duration-300 ${isActive('/')}`}>
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-1 font-medium text-sm">
+            <Link to="/" className={`px-5 py-2.5 rounded-full transition-all duration-300 ${isActive('/') ? 'bg-stone-800 text-white shadow-inner' : 'text-stone-400 hover:text-white hover:bg-stone-800/50'}`}>
                 {t('nav_home')}
             </Link>
             
             {/* Menu Dropdown */}
-            <div className="relative group h-full flex items-center">
+            <div className="relative group h-full flex items-center px-1">
               <Link 
                 to="/menu" 
-                className={`flex items-center gap-1 px-4 py-2 rounded-full transition-all duration-300 ${location.pathname.startsWith('/menu') ? 'bg-stone-800 text-white shadow-md' : 'text-stone-300 hover:bg-stone-800 hover:text-white'}`}
+                className={`flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-all duration-300 ${location.pathname.startsWith('/menu') ? 'bg-stone-800 text-white shadow-inner' : 'text-stone-400 hover:text-white hover:bg-stone-800/50'}`}
               >
-                {t('nav_menu')} <ChevronDown size={14} className="transition-transform duration-300 group-hover:rotate-180"/>
+                {t('nav_menu')} <ChevronDown size={14} className="text-stone-500 group-hover:text-orange-500 transition-transform duration-300 group-hover:rotate-180"/>
               </Link>
               
-              <div className="absolute top-full left-0 mt-2 w-56 hidden group-hover:block animate-in fade-in slide-in-from-top-2 z-50 pt-2">
-                <div className="bg-white shadow-2xl rounded-2xl border border-stone-100 overflow-hidden p-1">
+              {/* Dropdown Content */}
+              <div className="absolute top-full left-0 mt-2 w-64 hidden group-hover:block animate-in fade-in slide-in-from-top-2 z-50 pt-4">
+                <div className="bg-stone-900/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-2xl border border-stone-800/50 overflow-hidden p-2 ring-1 ring-white/5">
+                   <div className="px-4 py-2 text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1">Categories</div>
                    {['Breakfast', 'Lunch', 'Dinner', 'Desserts', 'Drinks'].map(cat => (
                       <Link 
                         key={cat}
                         to={`/menu?category=${cat}`} 
-                        className="flex items-center justify-between px-4 py-3 hover:bg-stone-50 transition text-stone-600 text-sm font-medium"
+                        className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-stone-800/80 transition text-stone-300 hover:text-white text-sm font-medium group/item"
                       >
-                         {cat} <ChevronDown size={12} className="-rotate-90 text-stone-300"/>
+                         <span className="flex items-center gap-3">
+                             <span className="w-1.5 h-1.5 rounded-full bg-stone-700 group-hover/item:bg-orange-500 transition-colors"></span>
+                             {cat}
+                         </span>
+                         <ChevronDown size={12} className="-rotate-90 text-stone-700 group-hover/item:text-orange-500 transition-colors opacity-0 group-hover/item:opacity-100 transform translate-x-2 group-hover/item:translate-x-0 duration-300"/>
                       </Link>
                    ))}
-                   <div className="border-t border-stone-100 my-1"></div>
-                   <Link to="/menu" className="flex items-center justify-between px-4 py-3 hover:bg-orange-50 transition text-orange-600 text-sm font-bold">
-                      Full Menu <MenuIcon size={14}/>
+                   <div className="h-px bg-gradient-to-r from-transparent via-stone-800 to-transparent my-2"></div>
+                   <Link to="/menu" className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-orange-500/10 transition text-orange-500 hover:text-orange-400 text-sm font-bold">
+                      View Full Menu <MenuIcon size={14}/>
                    </Link>
                 </div>
               </div>
             </div>
 
-            <Link to="/admin" className={`px-4 py-2 rounded-full transition-all duration-300 ${isActive('/admin')}`}>
+            {/* Admin Link */}
+            <Link to="/admin" className={`px-5 py-2.5 rounded-full transition-all duration-300 ${isActive('/admin') ? 'bg-stone-800 text-white shadow-inner' : 'text-stone-400 hover:text-white hover:bg-stone-800/50'}`}>
                 {t('nav_admin')}
             </Link>
 
-            {/* Call Icon */}
-             <a href="tel:+971504291207" className="p-2 rounded-full text-stone-300 hover:bg-stone-800 hover:text-white transition-all duration-300" title="Call Us">
-                 <Phone size={20} />
-             </a>
-
-            {/* PRIMARY ORDER BUTTON (Chat Trigger) */}
-            <button 
-              onClick={() => window.dispatchEvent(new CustomEvent('open-chat-widget'))}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#25D366] text-white border border-[#1ebd59] rounded-full hover:bg-[#20ba59] transition shadow-lg text-xs font-bold uppercase tracking-wider animate-pulse hover:animate-none"
-            >
-              <MessageCircle size={16} fill="white"/> Order Now
-            </button>
+            {/* Vertical Divider */}
+            <div className="w-px h-6 bg-stone-800 mx-2"></div>
 
             {/* Support Dropdown */}
-            <div className="relative group h-full flex items-center">
-                <button className={`flex items-center gap-1 px-4 py-2 rounded-full transition-all duration-300 ${location.pathname.startsWith('/info') ? 'bg-stone-800 text-white shadow-md' : 'text-stone-300 hover:bg-stone-800 hover:text-white'}`}>
-                    {t('nav_support')} <ChevronDown size={14} className="transition-transform duration-300 group-hover:rotate-180"/>
+            <div className="relative group h-full flex items-center px-1">
+                <button className={`flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-all duration-300 ${location.pathname.startsWith('/info') ? 'bg-stone-800 text-white shadow-inner' : 'text-stone-400 hover:text-white hover:bg-stone-800/50'}`}>
+                    {t('nav_support')} <ChevronDown size={14} className="text-stone-500 group-hover:text-orange-500 transition-transform duration-300 group-hover:rotate-180"/>
                 </button>
-                 <div className="absolute top-full right-0 mt-2 w-56 hidden group-hover:block animate-in fade-in slide-in-from-top-2 z-50 pt-2">
-                    <div className="bg-white shadow-2xl rounded-2xl border border-stone-100 overflow-hidden p-1">
-                        <Link to="/info/about" className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-stone-600 text-sm font-medium"><Users size={16} className="text-blue-500"/> {t('sub_about')}</Link>
-                        <Link to="/info/services" className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-stone-600 text-sm font-medium"><Briefcase size={16} className="text-purple-500"/> {t('sub_services')}</Link>
-                        <Link to="/info/location" className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-stone-600 text-sm font-medium"><MapPin size={16} className="text-red-500"/> {t('sub_location')}</Link>
-                        <Link to="/info/contact" className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-stone-600 text-sm font-medium"><Phone size={16} className="text-green-500"/> {t('sub_contact')}</Link>
-                        <Link to="/info/faq" className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-stone-600 text-sm font-medium"><HelpCircle size={16} className="text-orange-500"/> {t('sub_faq')}</Link>
+                 <div className="absolute top-full right-0 mt-2 w-64 hidden group-hover:block animate-in fade-in slide-in-from-top-2 z-50 pt-4">
+                    <div className="bg-stone-900/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-2xl border border-stone-800/50 overflow-hidden p-2 ring-1 ring-white/5">
+                        <div className="px-4 py-2 text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1">Help Center</div>
+                        {[
+                            { to: '/info/about', icon: Users, label: t('sub_about'), color: 'text-blue-400' },
+                            { to: '/info/services', icon: Briefcase, label: t('sub_services'), color: 'text-purple-400' },
+                            { to: '/info/location', icon: MapPin, label: t('sub_location'), color: 'text-red-400' },
+                            { to: '/info/contact', icon: Phone, label: t('sub_contact'), color: 'text-green-400' },
+                            { to: '/info/faq', icon: HelpCircle, label: t('sub_faq'), color: 'text-orange-400' }
+                        ].map((item, i) => (
+                            <Link key={i} to={item.to} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-stone-800/80 transition text-stone-300 hover:text-white text-sm font-medium group/item">
+                                <item.icon size={16} className={`${item.color} opacity-70 group-hover/item:opacity-100 transition-opacity`}/> 
+                                {item.label}
+                            </Link>
+                        ))}
                     </div>
                 </div>
             </div>
+
+            {/* Call Icon */}
+             <a href="tel:+971504291207" className="p-3 rounded-full text-stone-400 hover:bg-stone-800 hover:text-white transition-all duration-300 mx-1" title="Call Us">
+                 <Phone size={18} />
+             </a>
 
             {/* Search Button */}
             <div className="relative">
                 <button 
                     onClick={() => setIsSearchOpen(!isSearchOpen)}
-                    className={`p-2 rounded-full transition-all duration-300 ${isSearchOpen ? 'bg-stone-100 text-stone-900' : 'text-stone-300 hover:bg-stone-800 hover:text-white'}`}
+                    className={`p-3 rounded-full transition-all duration-300 ${isSearchOpen ? 'bg-stone-800 text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'}`}
                 >
-                    <Search size={20} />
+                    <Search size={18} />
                 </button>
                 {isSearchOpen && (
                     <form 
                         onSubmit={handleSearchSubmit}
-                        className="absolute top-full right-0 mt-2 w-72 bg-white p-2 rounded-xl shadow-xl border border-stone-100 animate-in fade-in slide-in-from-top-2 flex items-center gap-2 z-50"
+                        className="absolute top-full right-0 mt-4 w-80 bg-stone-900/95 backdrop-blur-xl p-3 rounded-2xl shadow-2xl border border-stone-800 animate-in fade-in slide-in-from-top-2 flex items-center gap-2 z-50 ring-1 ring-white/5"
                     >
                         <input 
                             type="text"
@@ -185,29 +198,37 @@ const NavBar: React.FC = () => {
                             value={navSearchTerm}
                             onChange={(e) => setNavSearchTerm(e.target.value)}
                             autoFocus
-                            className="flex-1 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-200 text-stone-800 placeholder:text-stone-400"
+                            className="flex-1 bg-stone-950/50 border border-stone-700/50 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-500/50 text-white placeholder:text-stone-600 transition-all"
                         />
-                         <button type="submit" className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition shadow-md">
+                         <button type="submit" className="p-2.5 bg-orange-600 text-white rounded-xl hover:bg-orange-500 transition shadow-lg hover:shadow-orange-500/20">
                              <ArrowRight size={16}/>
                          </button>
                     </form>
                 )}
             </div>
 
+            {/* Order CTA */}
+            <button 
+              onClick={() => window.dispatchEvent(new CustomEvent('open-chat-widget'))}
+              className="ml-3 flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-full hover:from-emerald-400 hover:to-emerald-500 transition shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)] text-xs font-bold uppercase tracking-wider transform hover:-translate-y-0.5 duration-300"
+            >
+              <MessageCircle size={16} fill="white" className="animate-pulse"/> Order
+            </button>
+
             {/* Language Selector */}
-            <div className="relative group ml-2">
-                <button className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full border border-stone-700 hover:border-orange-500 hover:bg-stone-800 transition bg-stone-900">
-                    <Globe size={16} className="text-stone-300"/>
-                    <span className="text-xs font-bold uppercase text-stone-300">{language}</span>
-                    <ChevronDown size={12} className="text-stone-500"/>
+            <div className="relative group ml-3">
+                <button className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full border border-stone-800 hover:border-stone-700 bg-stone-900/50 hover:bg-stone-800 transition text-stone-400 hover:text-white">
+                    <Globe size={14} />
+                    <span className="text-[10px] font-bold uppercase">{language}</span>
+                    <ChevronDown size={10} />
                 </button>
-                <div className="absolute top-full right-0 mt-2 w-32 hidden group-hover:block animate-in fade-in slide-in-from-top-2 z-50 pt-2">
-                    <div className="bg-white shadow-xl rounded-xl border border-stone-100 overflow-hidden p-1">
+                <div className="absolute top-full right-0 mt-2 w-32 hidden group-hover:block animate-in fade-in slide-in-from-top-2 z-50 pt-4">
+                    <div className="bg-stone-900/95 backdrop-blur-xl shadow-2xl rounded-xl border border-stone-800/50 overflow-hidden p-1 ring-1 ring-white/5">
                         {['en', 'es', 'fr', 'zh', 'ar', 'hi'].map((lang) => (
                             <button 
                                 key={lang}
                                 onClick={() => setLanguage(lang as LanguageCode)}
-                                className={`w-full text-left px-3 py-2 text-xs font-bold uppercase hover:bg-stone-50 rounded flex justify-between ${language === lang ? 'text-orange-600 bg-orange-50' : 'text-stone-600'}`}
+                                className={`w-full text-left px-3 py-2 text-xs font-bold uppercase hover:bg-stone-800 rounded-lg flex justify-between ${language === lang ? 'text-orange-500 bg-stone-800/50' : 'text-stone-400'}`}
                             >
                                 {lang} {language === lang && <CheckCircle size={12}/>}
                             </button>

@@ -5,7 +5,7 @@ import { MenuItem, ChatMessage, Order } from '../types';
 import { initChatSession, sendMessageToBot, parseOrderFromChat } from '../services/gemini';
 import { createOrder, generateWhatsAppLinkWithContext } from '../services/menuRepository';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface ChatWidgetProps {
   menu: MenuItem[];
@@ -32,6 +32,7 @@ const QuickActionPill: React.FC<{icon: any, label: string, onClick: () => void}>
 const ChatWidget: React.FC<ChatWidgetProps> = ({ menu }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
   
@@ -54,6 +55,9 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ menu }) => {
   const [detectedOrder, setDetectedOrder] = useState<DetectedOrder | null>(null);
   const [orderPlaced, setOrderPlaced] = useState<string | null>(null);
   const [placingOrder, setPlacingOrder] = useState(false);
+
+  // Hide widget on Admin/Agent portals to avoid clutter
+  const shouldHide = location.pathname.startsWith('/admin') || location.pathname.startsWith('/agent');
 
   // Initialize AI when menu loads
   useEffect(() => {
@@ -255,12 +259,36 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ menu }) => {
                        detectedOrder.items.length > 0 && 
                        detectedOrder.paymentMethod;
 
+  if (shouldHide) return null;
+
   return (
     <>
-      {/* 
-        REMOVED FLOATING BUTTON AS PER REQUEST 
-        Trigger logic is now handled solely by top bar via 'open-chat-widget' event.
-      */}
+      {/* Contextual Nudge for Home Page */}
+      {!isOpen && location.pathname === '/' && !hasOpened && (
+          <div className="fixed bottom-24 right-6 z-40 animate-bounce-slow">
+              <div className="bg-white px-4 py-3 rounded-xl shadow-xl border border-stone-100 flex items-center gap-3 relative">
+                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                  <div>
+                      <p className="text-xs font-bold text-stone-800">Hungry? 🍔</p>
+                      <p className="text-[10px] text-stone-500">I can take your order!</p>
+                  </div>
+                  {/* Triangle Tail */}
+                  <div className="absolute -bottom-2 right-6 w-4 h-4 bg-white transform rotate-45 border-r border-b border-stone-100"></div>
+              </div>
+          </div>
+      )}
+
+      {/* Floating Chat Trigger */}
+      {!isOpen && (
+        <button
+            onClick={() => { setIsOpen(true); setHasOpened(true); }}
+            className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-[#25D366] hover:bg-[#20b858] text-white rounded-full shadow-[0_4px_20px_rgba(37,211,102,0.4)] flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group"
+            aria-label="Open Chat"
+        >
+            <MessageCircle size={28} fill="white" className="text-white" />
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+        </button>
+      )}
 
       {/* Chat Window */}
       <div 

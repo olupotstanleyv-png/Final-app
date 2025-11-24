@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { MenuItem, Review, CartItem, OrderType, Order, ModifierOption, ModifierGroup } from '../types';
 import { ShoppingCart, Star, ChevronDown, ChevronUp, Send, User, Search, Trash2, CreditCard, Bike, ShoppingBag, Utensils, X, MessageCircle, Phone, ShieldCheck, Lock, Info, Flame, Wheat, FileText, CheckCircle, Banknote, Link as LinkIcon, Loader2, Filter, Store, MapPin, Plus, Minus, ArrowRight, Edit2, HelpCircle, Truck } from 'lucide-react';
@@ -20,6 +21,14 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
   const [activeDietary, setActiveDietary] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   
+  // Listen for category in URL to support deep linking from NavBar
+  useEffect(() => {
+      const catParam = searchParams.get('category');
+      if (catParam) {
+          setActiveCat(catParam);
+      }
+  }, [searchParams]);
+
   // Cart & Order
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -268,7 +277,12 @@ const Menu: React.FC<MenuProps> = ({ menu }) => {
                   {uniqueCategories.map(cat => (
                       <button
                         key={cat}
-                        onClick={() => setActiveCat(cat)}
+                        onClick={() => {
+                            setActiveCat(cat);
+                            // Update URL param for consistency
+                            if (cat === 'All') setSearchParams({});
+                            else setSearchParams({ category: cat });
+                        }}
                         className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition border ${
                             activeCat === cat 
                             ? 'bg-stone-900 text-white border-stone-900' 

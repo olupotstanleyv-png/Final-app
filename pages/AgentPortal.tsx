@@ -11,6 +11,11 @@ const AgentPortal: React.FC = () => {
     const [assignedOrders, setAssignedOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     
+    // Notification State
+    const [notification, setNotification] = useState<string | null>(null);
+    const prevOrdersCount = useRef(0);
+    const isFirstLoad = useRef(true);
+
     // POD Modal State
     const [showPOD, setShowPOD] = useState<string | null>(null);
     const [podType, setPodType] = useState<'code' | 'photo'>('code');
@@ -25,7 +30,6 @@ const AgentPortal: React.FC = () => {
 
     const loadData = async () => {
         if (!agentId) return;
-        setLoading(true);
         const agents = fetchAgents();
         const currentAgent = agents.find(a => a.id === agentId);
         
@@ -38,6 +42,14 @@ const AgentPortal: React.FC = () => {
                 o.status !== 'cancelled' &&
                 ['ready_for_logistics', 'picking', 'packing', 'picked_up', 'on_way', 'delivered', 'completed'].includes(o.deliveryStatus || '')
             );
+            
+            // Detect New Assignments
+            if (!isFirstLoad.current && myOrders.length > prevOrdersCount.current) {
+                setNotification("New Order Assigned! 📦");
+            }
+            prevOrdersCount.current = myOrders.length;
+            isFirstLoad.current = false;
+
             setAssignedOrders(myOrders.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
         }
         setLoading(false);
@@ -45,9 +57,17 @@ const AgentPortal: React.FC = () => {
 
     useEffect(() => {
         loadData();
-        const interval = setInterval(loadData, 10000);
+        const interval = setInterval(loadData, 5000); // Poll every 5s
         return () => clearInterval(interval);
     }, [agentId]);
+
+    // Auto-dismiss notification
+    useEffect(() => {
+        if (notification) {
+            const timer = setTimeout(() => setNotification(null), 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [notification]);
 
     // Chat polling when modal open
     useEffect(() => {
@@ -74,6 +94,7 @@ const AgentPortal: React.FC = () => {
     const handleStatusUpdate = async (orderId: string, newDeliveryStatus: string) => {
         await updateOrderStatus(orderId, 'approved', agentId, newDeliveryStatus);
         await loadData();
+        setNotification("Status updated. Customer notified 📲");
     };
 
     const handleCompleteDelivery = async (orderId: string) => {
@@ -106,7 +127,7 @@ const AgentPortal: React.FC = () => {
         
         // Refresh
         await loadData();
-        alert("Delivery Completed Successfully!");
+        setNotification("Delivery Completed! Customer Notified 🎉");
     };
 
     const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,7 +145,16 @@ const AgentPortal: React.FC = () => {
     if (!agent) return <div className="min-h-screen flex items-center justify-center bg-stone-100 p-6 text-center font-bold text-stone-500">Agent Access Denied.</div>;
 
     return (
-        <div className="min-h-screen bg-stone-100 font-sans pb-20">
+        <div className="min-h-screen bg-stone-100 font-sans pb-20 relative">
+            
+            {/* Notification Toast */}
+            {notification && (
+                <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-stone-900 text-white px-6 py-3 rounded-full shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 whitespace-nowrap border border-stone-800">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="font-bold text-sm">{notification}</span>
+                </div>
+            )}
+
             {/* Header */}
             <header className="bg-stone-900 text-white p-5 sticky top-0 z-20 shadow-xl">
                 <div className="flex justify-between items-center">
@@ -400,7 +430,7 @@ const AgentPortal: React.FC = () => {
                             <button 
                                 onClick={() => handleCompleteDelivery(showPOD)}
                                 disabled={podType === 'code' ? verifyCode.length !== 4 : !photoFile}
-                                className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold text-lg shadow-lg transition flex items-center justify-center gap-2"
+                                className="w-full bg-green-600 hover:bg-green-50 disabled:opacity-50 text-white py-4 rounded-xl font-bold text-lg shadow-lg transition flex items-center justify-center gap-2"
                             >
                                 <CheckCircle size={24}/> Complete Order
                             </button>
