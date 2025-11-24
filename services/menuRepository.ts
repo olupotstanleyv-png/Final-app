@@ -1,16 +1,20 @@
 
-
-import { MenuItem, Order, DeliveryAgent, AdminUser, SystemLog, AnalyticsMetrics, CartItem, Supplier, PurchaseOrder, InventoryForecast, POItem, InventoryTransaction, ProofOfDelivery } from '../types';
+import { MenuItem, Order, DeliveryAgent, AdminUser, SystemLog, AnalyticsMetrics, CartItem, Supplier, PurchaseOrder, InventoryForecast, POItem, InventoryTransaction, ProofOfDelivery, AppConfig, ContactInfo, OrderMessage, SalesMetrics, AgentNotificationSettings, CycleCountSession, InventoryReport } from '../types';
 
 const STORAGE_KEY = 'gourmetai_menu';
 const SETTINGS_KEY = 'gourmetai_db_settings';
 const BOT_SETTINGS_KEY = 'gourmetai_bot_settings';
+const APP_CONFIG_KEY = 'gourmetai_app_config';
 const ORDERS_KEY = 'gourmetai_orders';
 const ADMINS_KEY = 'gourmetai_admins';
 const AGENTS_KEY = 'gourmetai_agents';
+const AGENT_NOTIFICATIONS_KEY = 'gourmetai_agent_notifications';
 const SUPPLIERS_KEY = 'gourmetai_suppliers';
 const PO_KEY = 'gourmetai_pos';
 const TRANSACTIONS_KEY = 'gourmetai_inv_transactions';
+const CONTACT_INFO_KEY = 'gourmetai_contact_info';
+const ORDER_CHATS_KEY = 'gourmetai_order_chats';
+const CYCLE_COUNTS_KEY = 'gourmetai_cycle_counts';
 
 const RESTAURANT_PHONE = '971504291207'; 
 
@@ -37,6 +41,103 @@ export interface BotSettings {
   temperature: number;
 }
 
+const DEFAULT_APP_CONFIG: AppConfig = {
+  deliveryFee: 15.00,
+  maxRetries: 3,
+  logLevel: 'info',
+  resourceLimit: 100
+};
+
+const DEFAULT_CONTACT_INFO: ContactInfo = {
+    phone: '+971 50 429 1207',
+    email: 'support@stanleys.com',
+    address: 'Sheikh Mohammed bin Rashid Blvd, Downtown Dubai, UAE',
+    website: 'www.stanleys-restaurant.com',
+    whatsapp: 'https://wa.me/971504291207',
+    facebook: '@stanleys_dubai',
+    instagram: '@stanleys_fine_dining',
+    hoursWeekdays: '09:00 AM - 10:00 PM',
+    hoursWeekends: '10:00 AM - 11:00 PM',
+    mapLink: 'https://maps.google.com/?q=Downtown+Dubai',
+    timezone: 'Gulf Standard Time (GST)',
+    preferredMethod: 'WhatsApp for Orders, Email for Catering'
+};
+
+const DEFAULT_AGENT_NOTIFICATIONS: AgentNotificationSettings = {
+    enabled: true,
+    channels: {
+        email: true,
+        sms: false,
+        inApp: true
+    },
+    recipients: {
+        email: 'manager@stanleys.com',
+        phone: '+97150000000'
+    }
+};
+
+export const getAppConfig = (): AppConfig => {
+  const stored = localStorage.getItem(APP_CONFIG_KEY);
+  if (stored) return JSON.parse(stored);
+  return DEFAULT_APP_CONFIG;
+};
+
+export const saveAppConfig = (config: AppConfig) => {
+  localStorage.setItem(APP_CONFIG_KEY, JSON.stringify(config));
+};
+
+export const getContactInfo = (): ContactInfo => {
+    const stored = localStorage.getItem(CONTACT_INFO_KEY);
+    if (stored) return JSON.parse(stored);
+    return DEFAULT_CONTACT_INFO;
+};
+
+export const saveContactInfo = (info: ContactInfo) => {
+    localStorage.setItem(CONTACT_INFO_KEY, JSON.stringify(info));
+};
+
+export const getAgentNotificationSettings = (): AgentNotificationSettings => {
+    const stored = localStorage.getItem(AGENT_NOTIFICATIONS_KEY);
+    if (stored) return JSON.parse(stored);
+    return DEFAULT_AGENT_NOTIFICATIONS;
+};
+
+export const saveAgentNotificationSettings = (settings: AgentNotificationSettings) => {
+    localStorage.setItem(AGENT_NOTIFICATIONS_KEY, JSON.stringify(settings));
+};
+
+// Helper: Fetch with Retry logic from AppConfig
+const fetchWithRetry = async (url: string, options?: RequestInit): Promise<Response> => {
+    const config = getAppConfig();
+    let retries = config.maxRetries || 3;
+    let lastError;
+
+    while (retries >= 0) {
+        try {
+            const res = await fetch(url, options);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res;
+        } catch (e) {
+            lastError = e;
+            retries--;
+            if (retries >= 0) await new Promise(res => setTimeout(res, 1000));
+        }
+    }
+    throw lastError;
+};
+
+// --- PRIVACY UTILS ---
+export const maskPhoneNumber = (phone: string): string => {
+    if (!phone) return 'Unknown';
+    // Clean string, remove spaces
+    const clean = phone.replace(/\s/g, '');
+    if (clean.length < 8) return phone;
+    // Show first 4 chars, mask middle, show last 3
+    const prefix = clean.slice(0, 5); // e.g. +9715
+    const suffix = clean.slice(-3);
+    return `${prefix} **** ${suffix}`;
+};
+
 // --- INITIAL IMS DATA ---
 
 export const INITIAL_SUPPLIERS: Supplier[] = [
@@ -58,6 +159,7 @@ export const INITIAL_MENU: MenuItem[] = [
     phoneNumber: '+971504291207',
     calories: 450,
     allergens: ['Gluten', 'Eggs'],
+    dietaryLabels: ['V'],
     ingredients: ['Sourdough Bread', 'Hass Avocado', 'Free-range Eggs', 'Chili Flakes', 'Microgreens', 'Olive Oil'],
     stock: 50,
     sku: 'BRK-AVO-001',
@@ -66,7 +168,31 @@ export const INITIAL_MENU: MenuItem[] = [
     reorderPoint: 20,
     safetyStock: 10,
     leadTime: 3,
-    binLocation: 'A-01-01'
+    binLocation: 'A-01-01',
+    modifierGroups: [
+        {
+            id: 'bread',
+            name: 'Bread Choice',
+            required: true,
+            maxSelection: 1,
+            options: [
+                { id: 'sourdough', name: 'Sourdough', price: 0, available: true },
+                { id: 'multigrain', name: 'Multigrain', price: 0, available: true },
+                { id: 'gf', name: 'Gluten Free Bread', price: 2, available: true }
+            ]
+        },
+        {
+            id: 'extras',
+            name: 'Add-ons',
+            required: false,
+            maxSelection: 3,
+            options: [
+                { id: 'ex_egg', name: 'Extra Poached Egg', price: 3, available: true },
+                { id: 'smk_salmon', name: 'Smoked Salmon', price: 5, available: true },
+                { id: 'feta', name: 'Feta Cheese', price: 2, available: true }
+            ]
+        }
+    ]
   },
   { 
     id: '2', 
@@ -79,6 +205,7 @@ export const INITIAL_MENU: MenuItem[] = [
     phoneNumber: '+971504291207',
     calories: 620,
     allergens: ['Gluten', 'Dairy', 'Eggs'],
+    dietaryLabels: ['V'],
     ingredients: ['Flour', 'Blueberries', 'Maple Syrup', 'Butter', 'Milk', 'Eggs'],
     stock: 35,
     sku: 'BRK-PAN-002',
@@ -108,7 +235,29 @@ export const INITIAL_MENU: MenuItem[] = [
     reorderPoint: 25, // Currently below ROP
     safetyStock: 10,
     leadTime: 2,
-    binLocation: 'B-02-01'
+    binLocation: 'B-02-01',
+    modifierGroups: [
+        {
+            id: 'dressing',
+            name: 'Dressing Style',
+            required: true,
+            maxSelection: 1,
+            options: [
+                { id: 'tossed', name: 'Tossed', price: 0, available: true },
+                { id: 'side', name: 'On the Side', price: 0, available: true }
+            ]
+        },
+        {
+            id: 'protein',
+            name: 'Extra Protein',
+            required: false,
+            maxSelection: 2,
+            options: [
+                { id: 'dbl_chicken', name: 'Double Chicken', price: 5, available: true },
+                { id: 'bacon', name: 'Beef Bacon Bits', price: 3, available: true }
+            ]
+        }
+    ]
   },
   { 
     id: '4', 
@@ -129,7 +278,43 @@ export const INITIAL_MENU: MenuItem[] = [
     reorderPoint: 20, // Low stock
     safetyStock: 8,
     leadTime: 14,
-    binLocation: 'C-05-01'
+    binLocation: 'C-05-01',
+    modifierGroups: [
+        {
+            id: 'temp',
+            name: 'Cook Temperature',
+            required: true,
+            maxSelection: 1,
+            options: [
+                { id: 'rare', name: 'Rare', price: 0, available: true },
+                { id: 'med_rare', name: 'Medium Rare', price: 0, available: true },
+                { id: 'med', name: 'Medium', price: 0, available: true },
+                { id: 'well', name: 'Well Done', price: 0, available: true }
+            ]
+        },
+        {
+            id: 'sides',
+            name: 'Side Dish',
+            required: true,
+            maxSelection: 1,
+            options: [
+                { id: 'truffle_fries', name: 'Truffle Fries', price: 0, available: true },
+                { id: 'sweet_potato', name: 'Sweet Potato Fries', price: 2, available: true },
+                { id: 'salad', name: 'Green Salad', price: 0, available: true }
+            ]
+        },
+        {
+            id: 'removals',
+            name: 'Removals',
+            required: false,
+            maxSelection: 5,
+            options: [
+                { id: 'no_onion', name: 'No Onions', price: 0, available: true },
+                { id: 'no_tomato', name: 'No Tomato', price: 0, available: true },
+                { id: 'no_pickle', name: 'No Pickles', price: 0, available: true }
+            ]
+        }
+    ]
   },
   { 
     id: '5', 
@@ -142,6 +327,7 @@ export const INITIAL_MENU: MenuItem[] = [
     phoneNumber: '+971504291207',
     calories: 550,
     allergens: ['Dairy'],
+    dietaryLabels: ['V', 'GF'],
     ingredients: ['Arborio Rice', 'Black Truffle', 'Parmesan Cheese', 'Butter', 'Vegetable Stock', 'White Wine'],
     stock: 8,
     sku: 'DIN-RIS-001',
@@ -163,6 +349,7 @@ export const INITIAL_MENU: MenuItem[] = [
     phoneNumber: '+971504291207',
     calories: 480,
     allergens: ['Fish', 'Dairy'],
+    dietaryLabels: ['GF'],
     ingredients: ['Atlantic Salmon', 'Asparagus', 'Butter', 'Lemon', 'Dill', 'Garlic'],
     stock: 0,
     sku: 'DIN-SAL-002',
@@ -180,7 +367,7 @@ export const INITIAL_MENU: MenuItem[] = [
     price: 10, 
     category: 'Desserts', 
     imageUrl: 'https://images.unsplash.com/photo-1508737027454-e6454ef45afd?auto=format&fit=crop&w=400&q=80',
-    available: true,
+    available: true, 
     phoneNumber: '+971504291207',
     calories: 400,
     allergens: ['Dairy', 'Eggs', 'Gluten'],
@@ -198,9 +385,9 @@ export const INITIAL_MENU: MenuItem[] = [
 
 // Delivery Agents Data
 export const INITIAL_AGENTS: DeliveryAgent[] = [
-  { id: 'DA1', name: 'Mike Ross', phone: '+97150000001', status: 'available', currentLat: 25.1972, currentLng: 55.2744 },
-  { id: 'DA2', name: 'Harvey Specter', phone: '+97150000002', status: 'busy', currentLat: 25.2048, currentLng: 55.2708 },
-  { id: 'DA3', name: 'Louis Litt', phone: '+97150000003', status: 'available', currentLat: 25.1860, currentLng: 55.2600 },
+  { id: 'DA1', name: 'Mike Ross', phone: '+97150000001', status: 'available', vehicleType: 'bike', currentLat: 25.1972, currentLng: 55.2744 },
+  { id: 'DA2', name: 'Harvey Specter', phone: '+97150000002', status: 'busy', vehicleType: 'car', currentLat: 25.2048, currentLng: 55.2708 },
+  { id: 'DA3', name: 'Louis Litt', phone: '+97150000003', status: 'available', vehicleType: 'scooter', currentLat: 25.1860, currentLng: 55.2600 },
 ];
 
 const INITIAL_ADMINS: AdminUser[] = [
@@ -243,7 +430,8 @@ export const fetchMenu = async (): Promise<MenuItem[]> => {
   
   if (settings.type === 'googlesheet' && settings.sheetUrl) {
     try {
-      const res = await fetch(`${settings.sheetUrl}?action=get_menu`);
+      // Use retry logic for robustness
+      const res = await fetchWithRetry(`${settings.sheetUrl}?action=get_menu`);
       const data = await res.json();
       
       const mapped = data.map((item: any) => ({
@@ -253,7 +441,9 @@ export const fetchMenu = async (): Promise<MenuItem[]> => {
         phoneNumber: item.phoneNumber ? String(item.phoneNumber) : '+971504291207',
         stock: item.stock ? Number(item.stock) : 0,
         costPrice: item.costPrice ? Number(item.costPrice) : 0,
-        reorderPoint: item.reorderPoint ? Number(item.reorderPoint) : 0
+        reorderPoint: item.reorderPoint ? Number(item.reorderPoint) : 0,
+        modifierGroups: item.modifierGroups ? JSON.parse(item.modifierGroups) : undefined,
+        dietaryLabels: item.dietaryLabels ? JSON.parse(item.dietaryLabels) : undefined
       }));
       
       localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
@@ -276,7 +466,8 @@ export const logInventoryTransaction = (
     itemName: string,
     type: InventoryTransaction['type'],
     quantityChange: number,
-    reason?: string
+    reason?: string,
+    batchNumber?: string
 ) => {
     const transaction: InventoryTransaction = {
         id: `TXN-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -285,7 +476,8 @@ export const logInventoryTransaction = (
         type,
         quantityChange,
         reason,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        batchNumber
     };
     const stored = JSON.parse(localStorage.getItem(TRANSACTIONS_KEY) || '[]');
     localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify([transaction, ...stored]));
@@ -313,8 +505,8 @@ export const syncItem = async (action: 'add' | 'update' | 'delete', item?: MenuI
         logInventoryTransaction(item.id, item.name, 'adjustment', item.stock - oldItem.stock, 'Manual Admin Update');
     }
     
-    // Force availability based on stock
-    item.available = item.stock > 0;
+    // Auto toggle availability if stock hits 0, but respect manual overrides if stock > 0
+    if (item.stock <= 0) item.available = false;
     
     newMenu = newMenu.map(i => i.id === item.id ? item : i);
   }
@@ -323,7 +515,7 @@ export const syncItem = async (action: 'add' | 'update' | 'delete', item?: MenuI
 
   if (settings.type === 'googlesheet' && settings.sheetUrl) {
     try {
-        await fetch(settings.sheetUrl, {
+        await fetchWithRetry(settings.sheetUrl, {
             method: 'POST',
             body: JSON.stringify({
                 action: 'manage_menu',
@@ -367,8 +559,8 @@ export const updatePurchaseOrder = (po: PurchaseOrder) => {
     return updated;
 };
 
-// Receive PO: Updates Stock Levels
-export const receivePurchaseOrder = async (poId: string, receivedItems: Record<string, number>) => {
+// Receive PO: Updates Stock Levels, Bin Locations, and handles Batch Tracking
+export const receivePurchaseOrder = async (poId: string, receivedItems: Record<string, { qty: number, bin?: string, batch?: string, expiry?: string }>) => {
     const pos = fetchPurchaseOrders();
     const poIndex = pos.findIndex(p => p.id === poId);
     if (poIndex === -1) throw new Error("PO not found");
@@ -376,387 +568,394 @@ export const receivePurchaseOrder = async (poId: string, receivedItems: Record<s
     const po = pos[poIndex];
     
     // Update PO Item Counts
-    po.items = po.items.map(item => ({
-        ...item,
-        quantityReceived: item.quantityReceived + (receivedItems[item.itemId] || 0)
-    }));
+    po.items = po.items.map(item => {
+        const receivedData = receivedItems[item.itemId];
+        if (receivedData) {
+            return {
+                ...item,
+                quantityReceived: item.quantityReceived + receivedData.qty,
+                binLocation: receivedData.bin || item.binLocation,
+                batchNumber: receivedData.batch || item.batchNumber,
+                expiryDate: receivedData.expiry || item.expiryDate
+            };
+        }
+        return item;
+    });
     
     // Check if fully received
     const allReceived = po.items.every(i => i.quantityReceived >= i.quantityOrdered);
+    const anyReceived = po.items.some(i => i.quantityReceived > 0);
+    
     if (allReceived) {
         po.status = 'received';
         po.receivedDate = new Date().toISOString();
+    } else if (anyReceived) {
+        po.status = 'partially_received';
     }
 
-    pos[poIndex] = po;
-    localStorage.setItem(PO_KEY, JSON.stringify(pos));
-
-    // UPDATE MENU STOCK AND LOG
+    // Update Stock Levels in Menu
     const menu = await fetchMenu();
-    for (const [itemId, qty] of Object.entries(receivedItems)) {
-        if (qty > 0) {
-            const menuItem = menu.find(m => m.id === itemId);
+    let menuUpdated = false;
+
+    po.items.forEach(item => {
+        const receivedData = receivedItems[item.itemId];
+        if (receivedData && receivedData.qty > 0) {
+            const menuItem = menu.find(m => m.id === item.itemId);
             if (menuItem) {
-                // We bypass syncItem logging here to avoid double logging or generic 'Manual Update' reason
-                // We manually log 'receipt'
-                const oldStock = menuItem.stock || 0;
-                menuItem.stock = oldStock + qty;
-                menuItem.available = menuItem.stock > 0;
-                
-                // Save direct to storage
-                const newMenu = menu.map(m => m.id === itemId ? menuItem : m);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(newMenu));
-                
-                logInventoryTransaction(itemId, menuItem.name, 'receipt', qty, `PO #${poId}`);
+                menuItem.stock += receivedData.qty;
+                menuItem.binLocation = receivedData.bin || menuItem.binLocation;
+                // Log Transaction
+                logInventoryTransaction(item.itemId, item.name, 'receipt', receivedData.qty, `PO Receipt: ${po.id}`, receivedData.batch);
+                menuUpdated = true;
             }
         }
+    });
+
+    if (menuUpdated) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(menu));
     }
+
+    localStorage.setItem(PO_KEY, JSON.stringify(pos));
+    return po;
 };
 
-// Generate Forecast & Reorder Advice
 export const getInventoryAnalytics = async (): Promise<InventoryForecast[]> => {
     const menu = await fetchMenu();
-    const forecasts: InventoryForecast[] = menu.map(item => {
-        // Simulate usage rate (Mock: random between 1 and 5 per day)
-        const dailyUsage = Math.floor(Math.random() * 4) + 1; 
-        const rop = item.reorderPoint || 20;
-        
-        let status: 'ok' | 'low' | 'critical' | 'overstock' = 'ok';
-        if (item.stock <= 0) status = 'critical';
-        else if (item.stock < rop) status = 'low';
-        else if (item.stock > rop * 3) status = 'overstock';
+    // In a real app, calculate daily usage rate from order history
+    return menu.map(item => ({
+        itemId: item.id,
+        name: item.name,
+        currentStock: item.stock,
+        dailyUsageRate: Math.floor(Math.random() * 5), // Mock
+        suggestedReorder: Math.max(0, (item.reorderPoint || 10) - item.stock),
+        status: item.stock === 0 ? 'critical' : item.stock < (item.reorderPoint || 10) ? 'low' : item.stock > 100 ? 'overstock' : 'ok',
+        calculatedROP: item.reorderPoint || 10,
+        budgetRequired: Math.max(0, (item.reorderPoint || 10) - item.stock) * (item.costPrice || 0),
+        leadTime: item.leadTime || 1
+    }));
+};
 
-        const suggestedReorder = item.stock < rop ? (rop * 2) - item.stock : 0;
+export const performCycleCount = async (counts: Record<string, number>) => {
+    const menu = await fetchMenu();
+    const updatedMenu = menu.map(item => {
+        if (counts[item.id] !== undefined) {
+            const diff = counts[item.id] - item.stock;
+            if (diff !== 0) {
+                logInventoryTransaction(item.id, item.name, 'adjustment', diff, 'Cycle Count Adjustment');
+            }
+            return { ...item, stock: counts[item.id] };
+        }
+        return item;
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedMenu));
+};
 
-        return {
+// --- CYCLE COUNTING & REPORTING ---
+
+export const generateCycleCount = async (numItems: number = 5): Promise<CycleCountSession> => {
+    const menu = await fetchMenu();
+    // Shuffle and pick random items
+    const shuffled = menu.sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, numItems);
+
+    const session: CycleCountSession = {
+        id: `CC-${Date.now()}`,
+        status: 'in_progress',
+        createdAt: new Date().toISOString(),
+        performedBy: 'Admin',
+        items: selected.map(item => ({
             itemId: item.id,
             name: item.name,
-            currentStock: item.stock,
-            dailyUsageRate: dailyUsage,
-            suggestedReorder: suggestedReorder,
-            status: status
-        };
-    });
-    return forecasts;
+            systemQty: item.stock,
+            actualQty: null,
+            variance: 0,
+            binLocation: item.binLocation || 'N/A'
+        }))
+    };
+
+    const storedCounts = JSON.parse(localStorage.getItem(CYCLE_COUNTS_KEY) || '[]');
+    localStorage.setItem(CYCLE_COUNTS_KEY, JSON.stringify([...storedCounts, session]));
+    return session;
 };
 
-
-export const updateInventory = async (itemsSold: CartItem[]) => {
-    const currentMenu = await fetchMenu();
-    let updatedMenu = [...currentMenu];
-
-    itemsSold.forEach(soldItem => {
-        const idx = updatedMenu.findIndex(i => i.id === soldItem.id);
-        if (idx >= 0) {
-            const currentStock = updatedMenu[idx].stock || 0;
-            const newStock = Math.max(0, currentStock - soldItem.quantity);
-            
-            // Log Sale
-            logInventoryTransaction(soldItem.id, soldItem.name, 'sale', -soldItem.quantity, 'Order Fulfillment');
-
-            updatedMenu[idx] = {
-                ...updatedMenu[idx],
-                stock: newStock,
-                available: newStock > 0 // Auto mark out of stock if 0
+export const submitCycleCount = async (sessionId: string, items: { itemId: string, actualQty: number }[]) => {
+    const storedCounts = JSON.parse(localStorage.getItem(CYCLE_COUNTS_KEY) || '[]');
+    const sessionIdx = storedCounts.findIndex((s: CycleCountSession) => s.id === sessionId);
+    
+    if (sessionIdx === -1) throw new Error("Cycle count session not found");
+    const session = storedCounts[sessionIdx];
+    
+    // Update session
+    session.items = session.items.map((i: any) => {
+        const update = items.find(u => u.itemId === i.itemId);
+        if (update) {
+            return {
+                ...i,
+                actualQty: update.actualQty,
+                variance: update.actualQty - i.systemQty
             };
         }
+        return i;
     });
+    session.status = 'completed';
+    session.completedAt = new Date().toISOString();
+    
+    // Apply updates to main inventory
+    const countsMap: Record<string, number> = {};
+    session.items.forEach((i: any) => {
+        if (i.actualQty !== null) countsMap[i.itemId] = i.actualQty;
+    });
+    await performCycleCount(countsMap); // This handles stock updates and logging
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedMenu));
-
-    const settings = getSettings();
-    if (settings.type === 'googlesheet' && settings.sheetUrl) {
-         // Batch update mock
-    }
+    storedCounts[sessionIdx] = session;
+    localStorage.setItem(CYCLE_COUNTS_KEY, JSON.stringify(storedCounts));
+    return session;
 };
 
-// Used for Audit / Cycle Counting
-export const performCycleCount = async (itemId: string, actualCount: number, reason: string) => {
+export const getInventoryReport = async (): Promise<InventoryReport> => {
     const menu = await fetchMenu();
-    const item = menu.find(i => i.id === itemId);
-    if (!item) return;
-
-    const diff = actualCount - item.stock;
-    if (diff === 0) return;
-
-    item.stock = actualCount;
-    item.available = actualCount > 0; // Ensure availability reflects stock
+    const valuation = menu.reduce((acc, item) => acc + (item.stock * (item.costPrice || 0)), 0);
     
-    // Log Adjustment
-    logInventoryTransaction(item.id, item.name, 'adjustment', diff, reason);
+    // Mock Sales Calculation for turnover (Sales / Avg Inventory)
+    // In real app, sum transaction log 'sale' type
+    const transactions = getInventoryTransactions();
+    const salesQty = transactions.filter(t => t.type === 'sale').reduce((acc, t) => acc + Math.abs(t.quantityChange), 0);
+    const avgInventory = menu.reduce((acc, item) => acc + item.stock, 0) || 1; 
+    const turnover = salesQty / avgInventory;
 
-    const newMenu = menu.map(i => i.id === itemId ? item : i);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newMenu));
+    // Shrinkage: Sum of negative cycle count adjustments
+    const shrinkage = transactions
+        .filter(t => t.type === 'adjustment' && t.quantityChange < 0 && t.reason?.includes('Cycle Count'))
+        .reduce((acc, t) => {
+             const item = menu.find(m => m.id === t.itemId);
+             return acc + (Math.abs(t.quantityChange) * (item?.costPrice || 0));
+        }, 0);
+
+    // Dead Stock: Items with stock > 0 but low movement (Mocked by checking if updated recently or simply low forecasted usage)
+    const deadStock = menu.filter(item => item.stock > 0 && Math.random() > 0.8); // Random mock for demo
+
+    return {
+        totalValuation: valuation,
+        turnoverRate: turnover,
+        shrinkageValue: shrinkage,
+        deadStockCandidates: deadStock,
+        lowStockItems: menu.filter(item => item.stock <= (item.reorderPoint || 0))
+    };
 };
 
-// --- ADMIN MANAGEMENT ---
-
-export const fetchAdmins = (): AdminUser[] => {
-  const stored = localStorage.getItem(ADMINS_KEY);
-  if (stored) return JSON.parse(stored);
-  localStorage.setItem(ADMINS_KEY, JSON.stringify(INITIAL_ADMINS));
-  return INITIAL_ADMINS;
-};
-
-export const addAdmin = (admin: AdminUser) => {
-  const admins = fetchAdmins();
-  const newAdmins = [...admins, admin];
-  localStorage.setItem(ADMINS_KEY, JSON.stringify(newAdmins));
-  return newAdmins;
-};
-
-export const removeAdmin = (id: string) => {
-  const admins = fetchAdmins();
-  const newAdmins = admins.filter(a => a.id !== id);
-  localStorage.setItem(ADMINS_KEY, JSON.stringify(newAdmins));
-  return newAdmins;
-};
-
-// --- DELIVERY AGENT MANAGEMENT ---
-
+// --- AGENTS ---
 export const fetchAgents = (): DeliveryAgent[] => {
-  const stored = localStorage.getItem(AGENTS_KEY);
-  if (stored) return JSON.parse(stored);
-  localStorage.setItem(AGENTS_KEY, JSON.stringify(INITIAL_AGENTS));
-  return INITIAL_AGENTS;
+    const stored = localStorage.getItem(AGENTS_KEY);
+    if (stored) return JSON.parse(stored);
+    localStorage.setItem(AGENTS_KEY, JSON.stringify(INITIAL_AGENTS));
+    return INITIAL_AGENTS;
 };
 
-export const saveAgent = (agent: Partial<DeliveryAgent>) => {
-  const agents = fetchAgents();
-  const index = agents.findIndex(a => a.id === agent.id);
-  let newAgents;
-  
-  // If adding a new agent without an ID, generate one
-  const finalAgent: DeliveryAgent = {
-      id: agent.id || `DA${Date.now()}`,
-      name: agent.name || 'Unknown Agent',
-      phone: agent.phone || '',
-      status: agent.status || 'offline',
-      currentLat: agent.currentLat || 25.2048,
-      currentLng: agent.currentLng || 55.2708
-  };
-
-  if (index >= 0) {
-    newAgents = [...agents];
-    newAgents[index] = finalAgent;
-  } else {
-    newAgents = [...agents, finalAgent];
-  }
-  localStorage.setItem(AGENTS_KEY, JSON.stringify(newAgents));
-  return newAgents;
-};
-
-export const deleteAgent = (id: string) => {
+export const saveAgent = (agent: DeliveryAgent) => {
     const agents = fetchAgents();
-    const newAgents = agents.filter(a => a.id !== id);
-    localStorage.setItem(AGENTS_KEY, JSON.stringify(newAgents));
-    return newAgents;
+    const idx = agents.findIndex(a => a.id === agent.id);
+    if (idx >= 0) agents[idx] = agent;
+    else agents.push(agent);
+    localStorage.setItem(AGENTS_KEY, JSON.stringify(agents));
 };
 
-export const autoAssignAgent = async (orderId: string) => {
-    const agents = fetchAgents();
-    // Simple algo: Find first available agent. 
-    // In a real DMS, this would check distance/route.
-    const available = agents.filter(a => a.status === 'available');
-    
-    if(available.length === 0) {
-        console.log("No agents available for auto-assignment");
-        return null;
-    }
-    
-    const bestAgent = available[0]; // Naive logic: Pick first available
-    
-    // Mark order status
-    await updateOrderStatus(orderId, 'approved', bestAgent.id, 'ready_for_logistics');
-    
-    // Mark agent as busy (optional, but good for workflow)
-    saveAgent({...bestAgent, status: 'busy'});
-
-    return bestAgent;
+export const removeAgent = (id: string) => {
+    let agents = fetchAgents();
+    agents = agents.filter(a => a.id !== id);
+    localStorage.setItem(AGENTS_KEY, JSON.stringify(agents));
 };
 
-// --- ORDER MANAGEMENT SYSTEM ---
+// --- ORDER MANAGEMENT ---
 
-export const generatePaymentLink = (orderId: string, amount: number) => {
-    return `https://pay.stanleys.com/checkout/${orderId}?amt=${amount}`;
+export const fetchOrders = async (): Promise<Order[]> => {
+    const stored = localStorage.getItem(ORDERS_KEY);
+    if (stored) return JSON.parse(stored);
+    return [];
 };
 
 export const createOrder = async (order: Order): Promise<Order> => {
-    const settings = getSettings();
-    let finalOrder = { ...order };
-    
-    // Security: Generate Verification Code for Delivery
-    finalOrder.deliveryCode = Math.floor(1000 + Math.random() * 9000).toString();
-
-    // Set default source if not provided
-    if (!finalOrder.source) finalOrder.source = 'web_manual';
-
-    if (order.paymentMethod === 'online_link') {
-        finalOrder.paymentLink = generatePaymentLink(order.id, order.total);
-    }
-
-    await updateInventory(order.items);
-
-    const storedOrders = JSON.parse(localStorage.getItem(ORDERS_KEY) || '[]');
-    localStorage.setItem(ORDERS_KEY, JSON.stringify([...storedOrders, finalOrder]));
-
-    if (settings.type === 'googlesheet' && settings.sheetUrl) {
-        try {
-            await fetch(settings.sheetUrl, {
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'create_order',
-                    data: finalOrder
-                })
-            });
-        } catch(e) {
-            console.error("Failed to sync order to sheet", e);
-        }
-    }
-
-    return finalOrder;
-};
-
-export const fetchOrders = async (): Promise<Order[]> => {
-    const settings = getSettings();
-    const localOrders = JSON.parse(localStorage.getItem(ORDERS_KEY) || '[]');
-
-    if (settings.type === 'googlesheet' && settings.sheetUrl) {
-        try {
-            const res = await fetch(`${settings.sheetUrl}?action=get_orders`);
-            const data = await res.json();
-            const cloudOrders = data.map((o: any) => ({
-                ...o,
-                items: typeof o.items === 'string' ? JSON.parse(o.items) : o.items
-            }));
-            localStorage.setItem(ORDERS_KEY, JSON.stringify(cloudOrders));
-            return cloudOrders;
-        } catch (e) {
-            console.error("Error fetching cloud orders, using local", e);
-            return localOrders;
-        }
-    }
-    return localOrders;
-};
-
-export const updateOrderStatus = async (
-    orderId: string, 
-    status: string, 
-    agentId?: string, 
-    deliveryStatus?: string, 
-    proofOfDelivery?: ProofOfDelivery
-) => {
     const orders = await fetchOrders();
-    const updatedOrders = orders.map(o => {
-        if (o.id === orderId) {
-            // Logic for delivery status transitions
-            let newDeliveryStatus = o.deliveryStatus;
-            if (deliveryStatus) {
-                newDeliveryStatus = deliveryStatus as any;
-            } else if (agentId && !o.deliveryAgentId) {
-                // If agent is newly assigned, move to logistics queue
-                newDeliveryStatus = 'ready_for_logistics';
-            }
+    orders.push(order);
+    localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+    return order;
+};
 
-            return {
-                ...o,
-                status: status as any,
-                deliveryAgentId: agentId || o.deliveryAgentId,
-                deliveryStatus: newDeliveryStatus,
-                proofOfDelivery: proofOfDelivery || o.proofOfDelivery
-            };
+export const updateOrderStatus = async (orderId: string, status: string, agentId?: string, deliveryStatus?: string, pod?: ProofOfDelivery) => {
+    const orders = await fetchOrders();
+    const idx = orders.findIndex(o => o.id === orderId);
+    if (idx >= 0) {
+        orders[idx].status = status as any;
+        if (agentId !== undefined) orders[idx].deliveryAgentId = agentId;
+        if (deliveryStatus !== undefined) orders[idx].deliveryStatus = deliveryStatus as any;
+        if (pod !== undefined) orders[idx].proofOfDelivery = pod;
+        
+        // Auto-generate delivery code if approved
+        if (status === 'approved' && !orders[idx].deliveryCode) {
+            orders[idx].deliveryCode = Math.floor(1000 + Math.random() * 9000).toString();
         }
-        return o;
-    });
-    
-    localStorage.setItem(ORDERS_KEY, JSON.stringify(updatedOrders));
-    
-    // If completing delivery, free up the agent
-    if (status === 'completed' && agentId) {
-        const agents = fetchAgents();
-        const agent = agents.find(a => a.id === agentId);
-        if (agent) {
-            saveAgent({...agent, status: 'available'});
+        
+        // Deduct Inventory on Completion/Approval (depending on workflow, let's say Approval)
+        if (status === 'approved' && orders[idx].status !== 'approved') {
+             orders[idx].items.forEach(orderItem => {
+                 syncItem('update', { ...orderItem, stock: Math.max(0, orderItem.stock - orderItem.quantity) } as MenuItem);
+                 logInventoryTransaction(orderItem.id, orderItem.name, 'sale', -orderItem.quantity, `Order #${orderId}`);
+             });
         }
+
+        localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
     }
+};
 
-    const settings = getSettings();
-    if (settings.type === 'googlesheet' && settings.sheetUrl) {
-         // Cloud update hook
+export const updateOrderPickupTime = async (orderId: string, time: string) => {
+    const orders = await fetchOrders();
+    const idx = orders.findIndex(o => o.id === orderId);
+    if (idx >= 0) {
+        orders[idx].pickupTime = time;
+        localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
     }
-    return updatedOrders;
 };
 
-export const generateWhatsAppOrderMessage = (order: Order) => {
-  const itemsList = order.items.map(i => `• ${i.quantity}x ${i.name} ${i.modifiers ? `(${i.modifiers})` : ''}`).join('\n');
-  const text = `*New Order Alert!* 🍽️\n\nOrder ID: ${order.id}\nCustomer: ${order.customerName}\nPhone: ${order.phoneNumber}\nType: ${order.type.toUpperCase()}\n\n*Items:*\n${itemsList}\n\n*Total: $${order.total}*\nPayment: ${order.paymentMethod}\n\nPlease approve this order in the system.`;
-  
-  return `https://wa.me/${RESTAURANT_PHONE}?text=${encodeURIComponent(text)}`;
+// --- ORDER CHAT ---
+
+export const fetchOrderMessages = (orderId: string): OrderMessage[] => {
+    const allChats = JSON.parse(localStorage.getItem(ORDER_CHATS_KEY) || '{}');
+    return allChats[orderId] || [];
 };
 
-export const generateWhatsAppChatOrder = (items: any[], customerName: string) => {
-    const itemsList = items.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
-    const text = `*Hi Stanley's!* 👋\n\nI'd like to place an order via WhatsApp Chat.\n\n*Customer:* ${customerName}\n\n*My Order:*\n${itemsList}\n\nPlease confirm total and delivery time.`;
-    return `https://wa.me/${RESTAURANT_PHONE}?text=${encodeURIComponent(text)}`;
+export const sendOrderMessage = (orderId: string, text: string, sender: 'customer' | 'agent' | 'admin') => {
+    const allChats = JSON.parse(localStorage.getItem(ORDER_CHATS_KEY) || '{}');
+    const messages = allChats[orderId] || [];
+    const newMessage: OrderMessage = {
+        id: Date.now().toString(),
+        orderId,
+        sender: sender as any,
+        text,
+        timestamp: new Date().toISOString(),
+        read: false
+    };
+    allChats[orderId] = [...messages, newMessage];
+    localStorage.setItem(ORDER_CHATS_KEY, JSON.stringify(allChats));
 };
 
-export const generateWhatsAppLinkWithContext = (messageContext?: string, draftOrder?: { items: any[], customerName?: string, total?: number }) => {
-    let text = "";
+// --- ANALYTICS & LOGS ---
+
+export const fetchAnalyticsMetrics = (): AnalyticsMetrics => {
+    // Mock analytics for demo
+    return {
+        conversionRate: 3.5,
+        abandonmentRate: 45,
+        avgResponseTime: 120, // seconds
+        activeConversations: 12,
+        topIntents: [
+            { label: 'Check Menu', count: 150 },
+            { label: 'Order Status', count: 80 },
+            { label: 'Business Hours', count: 45 }
+        ],
+        fallOffPoints: [
+            { step: 'Menu View', drop: 0 },
+            { step: 'Add to Cart', drop: 30 },
+            { step: 'Checkout', drop: 60 }
+        ]
+    };
+};
+
+export const getSalesMetrics = async (): Promise<SalesMetrics> => {
+    const orders = await fetchOrders();
+    const today = new Date().toDateString();
+    const todayOrders = orders.filter(o => new Date(o.timestamp).toDateString() === today);
+    const dailyTotal = todayOrders.reduce((acc, o) => acc + o.total, 0);
     
-    if (draftOrder && draftOrder.items.length > 0) {
-        const itemsList = draftOrder.items.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
-        const totalStr = draftOrder.total ? `\n*Est. Total: $${draftOrder.total.toFixed(2)}*` : '';
-        text = `*Hi! I was chatting on your website.* 👋\n\nI'd like to finalize this order on WhatsApp:\n\n*Items:*\n${itemsList}${totalStr}\n\n*Name:* ${draftOrder.customerName || 'Guest'}\n\nPlease confirm availability and delivery.`;
-    } else if (messageContext) {
-        text = `*Hi! I was chatting on your website.* 👋\n\nHere is my last question:\n"${messageContext}"`;
-    } else {
-        text = `*Hi Stanley's!* 👋\n\nI'd like to order or ask a question.`;
-    }
+    // Mock historical data for chart
+    const dailyRevenueChart = [150, 230, 180, 290, 200, 310, dailyTotal || 100]; 
 
-    return `https://wa.me/${RESTAURANT_PHONE}?text=${encodeURIComponent(text)}`;
-};
-
-export const generateWhatsAppApprovalMessage = (order: Order) => {
-  let prepTime = 45; 
-  if (order.type === 'pickup') prepTime = 20;
-  if (order.type === 'dine-in') prepTime = 15;
-
-  const eta = new Date(Date.now() + prepTime * 60000);
-  const timeStr = eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  const text = `Hello ${order.customerName}! 👋\n\nYour order *${order.id}* has been APPROVED! ✅\n\n🕒 *Estimated Time:* ${timeStr}\n\nWe are preparing it now. You can track your live status here:\n${window.location.origin}/#/tracking/${order.id}\n\nThank you for choosing Stanley's!`;
-  
-  const cleanPhone = order.phoneNumber.replace(/[^0-9]/g, '');
-  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+    return {
+        dailyTotal,
+        weeklyTotal: dailyTotal * 7, // mock
+        monthlyTotal: dailyTotal * 30, // mock
+        yearlyTotal: dailyTotal * 365, // mock
+        orderCountToday: todayOrders.length,
+        dailyRevenueChart,
+        posDailyTotal: todayOrders.filter(o => o.source === 'pos').reduce((acc, o) => acc + o.total, 0)
+    };
 };
 
 export const fetchSystemLogs = (): SystemLog[] => {
     return [
-        { id: 'L1', timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString(), level: 'info', event: 'Menu Synced', details: 'Menu cached successfully from Google Sheet', source: 'Database' },
-        { id: 'L2', timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), level: 'info', event: 'System Healthy', details: 'All services operational', source: 'Bot' },
-        { id: 'L3', timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(), level: 'info', event: 'Payment Verified', details: 'Payment gateway connected successfully', source: 'OrderSystem' },
-        { id: 'L4', timestamp: new Date(Date.now() - 1000 * 3600).toISOString(), level: 'security', event: 'Auth Check', details: 'Admin login authorized', source: 'Auth' },
-        { id: 'L5', timestamp: new Date(Date.now() - 1000 * 3600 * 2).toISOString(), level: 'info', event: 'Backup', details: 'Daily snapshot completed', source: 'Database' },
+        { id: '1', timestamp: new Date().toISOString(), level: 'info', event: 'System Start', details: 'Application initialized', source: 'OrderSystem' },
+        { id: '2', timestamp: new Date(Date.now() - 10000).toISOString(), level: 'warning', event: 'High Latency', details: 'Menu fetch took > 2s', source: 'Database' }
     ];
 };
 
-export const fetchAnalyticsMetrics = (): AnalyticsMetrics => {
-    return {
-        conversionRate: 24.5,
-        abandonmentRate: 35.2,
-        avgResponseTime: 450,
-        activeConversations: 12,
-        topIntents: [
-            { label: 'Order Food', count: 450 },
-            { label: 'Check Hours', count: 120 },
-            { label: 'Dietary Query', count: 85 },
-            { label: 'Reservation', count: 45 },
-        ],
-        fallOffPoints: [
-            { step: 'Menu View', drop: 0 },
-            { step: 'Add to Cart', drop: 25 },
-            { step: 'Checkout Start', drop: 45 },
-            { step: 'Payment', drop: 60 },
-        ]
-    };
+export const exportDataToSheet = async (type: 'menu' | 'orders' | 'inventory') => {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    console.log(`Exported ${type} to Google Sheet`);
+    return true;
+};
+
+export const importDataFromSheet = async (type: 'menu') => {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    console.log(`Imported ${type} from Google Sheet`);
+    return true;
+};
+
+// --- WHATSAPP UTILS ---
+
+export const generateWhatsAppLinkWithContext = (contextMessage: string = '', orderData?: any) => {
+    const phone = RESTAURANT_PHONE;
+    let text = "Hi Stanley's! 👋 I'd like to place an order.";
+    
+    if (orderData) {
+        const itemsList = orderData.items.map((i: any) => {
+            let line = `- ${i.quantity}x ${i.name}`;
+            // Format modifiers for WhatsApp
+            if (i.selectedModifiers && i.selectedModifiers.length > 0) {
+                const mods = i.selectedModifiers.map((m:any) => m.name).join(', ');
+                line += ` (${mods})`;
+            }
+            if (i.specialInstructions) line += ` [Note: ${i.specialInstructions}]`;
+            return line;
+        }).join('\n');
+        text += `\n\nI have a draft order:\n${itemsList}\n\nTotal: $${orderData.total.toFixed(2)}`;
+    } else if (contextMessage) {
+        text += `\n\nContext: ${contextMessage}`;
+    }
+    
+    return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+};
+
+export const generateWhatsAppOrderMessage = (order: Order) => {
+    const phone = RESTAURANT_PHONE;
+    const itemsList = order.items.map(i => {
+        let line = `- ${i.quantity}x ${i.name}`;
+        if (i.selectedModifiers && i.selectedModifiers.length > 0) {
+            const mods = i.selectedModifiers.map((m:any) => m.name).join(', ');
+            line += ` (${mods})`;
+        }
+        return line;
+    }).join('\n');
+    
+    const text = `NEW ORDER #${order.id}\n\nCustomer: ${order.customerName}\nPhone: ${order.phoneNumber}\n\nItems:\n${itemsList}\n\nTotal: $${order.total.toFixed(2)}\n\nType: ${order.type.toUpperCase()}`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+};
+
+// --- ADMIN UTILS ---
+
+export const fetchAdmins = (): AdminUser[] => {
+    const stored = localStorage.getItem(ADMINS_KEY);
+    if (stored) return JSON.parse(stored);
+    return INITIAL_ADMINS;
+};
+
+export const addAdmin = (admin: AdminUser) => {
+    const admins = fetchAdmins();
+    admins.push(admin);
+    localStorage.setItem(ADMINS_KEY, JSON.stringify(admins));
+};
+
+export const removeAdmin = (id: string) => {
+    let admins = fetchAdmins();
+    admins = admins.filter(a => a.id !== id);
+    localStorage.setItem(ADMINS_KEY, JSON.stringify(admins));
 };

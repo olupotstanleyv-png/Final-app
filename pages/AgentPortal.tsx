@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { MapPin, Phone, CheckCircle, Package, Navigation, Clock, RefreshCw, Camera, PenTool, X, ShieldCheck, Box } from 'lucide-react';
-import { Order, DeliveryAgent, ProofOfDelivery } from '../types';
-import { fetchOrders, fetchAgents, updateOrderStatus, saveAgent } from '../services/menuRepository';
+import { MapPin, Phone, CheckCircle, Package, Navigation, Clock, RefreshCw, Camera, PenTool, X, ShieldCheck, Box, MessageCircle, Send, User } from 'lucide-react';
+import { Order, DeliveryAgent, ProofOfDelivery, OrderMessage } from '../types';
+import { fetchOrders, fetchAgents, updateOrderStatus, saveAgent, fetchOrderMessages, sendOrderMessage } from '../services/menuRepository';
 
 const AgentPortal: React.FC = () => {
     const { agentId } = useParams<{ agentId: string }>();
@@ -16,6 +16,12 @@ const AgentPortal: React.FC = () => {
     const [podType, setPodType] = useState<'code' | 'photo'>('code');
     const [verifyCode, setVerifyCode] = useState('');
     const [photoFile, setPhotoFile] = useState<string | null>(null);
+
+    // Chat Modal State
+    const [chatOrderId, setChatOrderId] = useState<string | null>(null);
+    const [messages, setMessages] = useState<OrderMessage[]>([]);
+    const [newMessage, setNewMessage] = useState('');
+    const chatEndRef = useRef<HTMLDivElement>(null);
 
     const loadData = async () => {
         if (!agentId) return;
@@ -42,6 +48,28 @@ const AgentPortal: React.FC = () => {
         const interval = setInterval(loadData, 10000);
         return () => clearInterval(interval);
     }, [agentId]);
+
+    // Chat polling when modal open
+    useEffect(() => {
+        if (!chatOrderId) return;
+        const poll = () => {
+            setMessages(fetchOrderMessages(chatOrderId));
+        };
+        poll();
+        const interval = setInterval(poll, 3000);
+        return () => clearInterval(interval);
+    }, [chatOrderId]);
+
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
+    const handleSendMessage = () => {
+        if (!chatOrderId || !newMessage.trim()) return;
+        sendOrderMessage(chatOrderId, newMessage, 'agent');
+        setNewMessage('');
+        setMessages(fetchOrderMessages(chatOrderId));
+    };
 
     const handleStatusUpdate = async (orderId: string, newDeliveryStatus: string) => {
         await updateOrderStatus(orderId, 'approved', agentId, newDeliveryStatus);
@@ -107,8 +135,8 @@ const AgentPortal: React.FC = () => {
                         <p className="text-xs text-stone-400 mt-0.5">Driver: {agent.name}</p>
                     </div>
                     <div className="flex items-center gap-2 bg-stone-800 px-3 py-1.5 rounded-full border border-stone-700">
-                        <div className={`w-2.5 h-2.5 rounded-full ${agent.status === 'available' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : 'bg-orange-400'}`}></div>
-                        <span className="text-xs font-bold uppercase tracking-wide">{agent.status}</span>
+                        <div className={`w-2.5 h-2.5 rounded-full ${agent.status === 'available' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : agent.status === 'on_break' ? 'bg-yellow-400' : 'bg-orange-400'}`}></div>
+                        <span className="text-xs font-bold uppercase tracking-wide">{agent.status.replace('_', ' ')}</span>
                     </div>
                 </div>
             </header>
@@ -129,7 +157,7 @@ const AgentPortal: React.FC = () => {
                         <div className="flex flex-col items-center justify-center py-12 text-stone-400">
                             <Package size={64} className="opacity-20 mb-4"/>
                             <p className="text-sm font-bold">No active assignments.</p>
-                            <p className="text-xs">You are currently {agent.status}.</p>
+                            <p className="text-xs">You are currently {agent.status.replace('_', ' ')}.</p>
                         </div>
                     )}
 
@@ -161,6 +189,21 @@ const AgentPortal: React.FC = () => {
                                 </div>
 
                                 <div className="p-5">
+                                    {/* Customer Details Section */}
+                                    <div className="bg-stone-50 rounded-xl p-3 mb-4 border border-stone-100">
+                                        <h4 className="text-xs font-bold text-stone-400 uppercase mb-2 flex items-center gap-1"><User size={12}/> Customer Details</h4>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <p className="font-bold text-stone-800 text-sm">{order.customerName}</p>
+                                                <p className="text-xs text-stone-500">{order.phoneNumber}</p>
+                                            </div>
+                                            <a href={`tel:${order.phoneNumber}`} className="bg-white border border-stone-200 p-2 rounded-full text-stone-600 hover:text-green-600"><Phone size={14}/></a>
+                                        </div>
+                                        <div className="text-xs text-stone-600 border-t border-stone-200 pt-2 mt-2">
+                                            <span className="font-bold">Items:</span> {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                                        </div>
+                                    </div>
+
                                     {/* Route Info */}
                                     <div className="flex flex-col gap-4 mb-6 relative">
                                         {/* Connector Line */}
@@ -180,7 +223,14 @@ const AgentPortal: React.FC = () => {
                                                 <p className="text-xs font-bold text-stone-500 uppercase">Dropoff</p>
                                                 <p className="font-bold text-stone-800 text-sm">{order.deliveryAddress || "Client Location"}</p>
                                                 <div className="flex gap-4 mt-2">
-                                                    <a href={`tel:${order.phoneNumber}`} className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100"><Phone size={12}/> Call</a>
+                                                    <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.deliveryAddress || '')}`} target="_blank" className="flex items-center gap-1 text-xs font-bold text-stone-600 bg-stone-100 px-2 py-1 rounded hover:bg-stone-200"><Navigation size={12}/> Map</a>
+                                                    {/* Chat Trigger */}
+                                                    <button 
+                                                        onClick={() => setChatOrderId(order.id)}
+                                                        className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100"
+                                                    >
+                                                        <MessageCircle size={12}/> Chat Customer
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -231,6 +281,56 @@ const AgentPortal: React.FC = () => {
                     })}
                 </div>
             </div>
+
+            {/* CHAT MODAL */}
+            {chatOrderId && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+                    <div className="bg-white w-full max-w-md h-[500px] rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 flex flex-col">
+                        <div className="bg-blue-600 text-white p-4 flex justify-between items-center shrink-0">
+                            <h3 className="font-bold flex items-center gap-2"><MessageCircle size={20}/> Customer Chat</h3>
+                            <button onClick={() => setChatOrderId(null)}><X size={24} className="text-blue-200 hover:text-white"/></button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-4 bg-stone-100 space-y-3">
+                             {messages.length === 0 && (
+                                <div className="text-center text-stone-400 text-sm mt-10">Start conversation...</div>
+                             )}
+                             {messages.map(msg => (
+                                <div key={msg.id} className={`flex ${msg.sender === 'agent' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[80%] p-3 rounded-xl text-sm shadow-sm ${
+                                        msg.sender === 'agent' 
+                                        ? 'bg-blue-600 text-white rounded-br-none' 
+                                        : 'bg-white text-stone-800 border border-stone-200 rounded-bl-none'
+                                    }`}>
+                                        <p>{msg.text}</p>
+                                        <span className={`text-[10px] block mt-1 text-right opacity-70`}>
+                                            {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                            <div ref={chatEndRef} />
+                        </div>
+
+                        <div className="p-4 bg-white border-t border-stone-200 flex gap-2 shrink-0">
+                             <input 
+                                type="text" 
+                                value={newMessage}
+                                onChange={(e) => setNewMessage(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                placeholder="Type a message..."
+                                className="flex-1 p-3 rounded-xl border border-stone-300 focus:outline-none focus:border-blue-500 text-sm"
+                            />
+                            <button 
+                                onClick={handleSendMessage}
+                                className="bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition"
+                            >
+                                <Send size={20}/>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* PROOF OF DELIVERY MODAL */}
             {showPOD && (

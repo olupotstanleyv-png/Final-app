@@ -1,714 +1,654 @@
-
 import React, { useState, useEffect } from 'react';
-import { MenuItem, Review, CartItem, OrderType, Order } from '../types';
-import { ShoppingCart, Star, ChevronDown, ChevronUp, Send, User, Search, Trash2, CreditCard, Bike, ShoppingBag, Utensils, X, MessageCircle, Phone, ShieldCheck, Lock, Info, Flame, Wheat, FileText, CheckCircle, Banknote, Link as LinkIcon, Loader2, Filter, Store, MapPin } from 'lucide-react';
+import { MenuItem, Review, CartItem, OrderType, Order, ModifierOption, ModifierGroup } from '../types';
+import { ShoppingCart, Star, ChevronDown, ChevronUp, Send, User, Search, Trash2, CreditCard, Bike, ShoppingBag, Utensils, X, MessageCircle, Phone, ShieldCheck, Lock, Info, Flame, Wheat, FileText, CheckCircle, Banknote, Link as LinkIcon, Loader2, Filter, Store, MapPin, Plus, Minus, ArrowRight, Edit2, HelpCircle, Truck } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { createOrder, generateWhatsAppOrderMessage, COUNTRY_CODES } from '../services/menuRepository';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { createOrder, generateWhatsAppOrderMessage, COUNTRY_CODES, getAppConfig } from '../services/menuRepository';
 
 interface MenuProps {
   menu: MenuItem[];
 }
 
-const DELIVERY_FEE = 15.00; // Configurable delivery fee
-
 const Menu: React.FC<MenuProps> = ({ menu }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [appConfig] = useState(getAppConfig());
   
-  // Category Management
-  const uniqueCategories: string[] = Array.from(new Set(menu.map(item => item.category))).filter((c): c is string => !!c).sort();
-  const activeCat = searchParams.get('category') || t('menu_category_all');
-
-  const handleCategoryChange = (cat: string) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (cat === t('menu_category_all') || cat === 'All') {
-      newParams.delete('category');
-    } else {
-      newParams.set('category', cat);
-    }
-    setSearchParams(newParams);
-  };
-
-  const [searchTerm, setSearchTerm] = useState('');
+  // --- State Management ---
+  const [activeCat, setActiveCat] = useState<string>('All');
+  const [activeDietary, setActiveDietary] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   
-  // Cart & Order State
+  // Cart & Order
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [orderType, setOrderType] = useState<OrderType>('dine-in'); // Default to dine-in
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'online_link'>('cash');
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [orderType, setOrderType] = useState<OrderType>('dine-in');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'online_link'>('cash');
+  
+  // Checkout Form
   const [customerName, setCustomerName] = useState('');
   const [customerPhoneCode, setCustomerPhoneCode] = useState('+971');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
   
-  // Confirmation State
+  // Modal State (Customization)
+  const [modalItem, setModalItem] = useState<MenuItem | null>(null);
+  const [modalSelections, setModalSelections] = useState<Record<string, ModifierOption[]>>({}); // GroupID -> Selected Options
+  const [modalInstructions, setModalInstructions] = useState('');
+  const [modalQuantity, setModalQuantity] = useState(1);
+  const [editingCartIndex, setEditingCartIndex] = useState<number | null>(null); // If editing an existing cart item
+
+  // Order Status
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
+
+  // Derived Data
+  const uniqueCategories = ['All', ...Array.from(new Set(menu.map(i => i.category))).sort()];
   
-  // Item Expansion & Reviews State
-  const [reviews, setReviews] = useState<Record<string, Review[]>>({});
-  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<Record<string, 'details' | 'reviews'>>({}); 
-  const [reviewInputs, setReviewInputs] = useState<Record<string, string>>({});
-  const [ratingInputs, setRatingInputs] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    const storedReviews = localStorage.getItem('gourmetai_reviews');
-    if (storedReviews) {
-      try {
-        setReviews(JSON.parse(storedReviews) as Record<string, Review[]>);
-      } catch (e: any) {
-        console.error("Failed to parse reviews", e);
-      }
-    }
-  }, []);
-
-  // --- Cart Functions ---
-  const addToCart = (item: MenuItem) => {
-    if (confirmedOrder) {
-        setConfirmedOrder(null);
-    }
-
-    setCart(prev => {
-      const existing = prev.find(i => i.id === item.id);
-      if (existing) {
-        return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-      }
-      return [...prev, { ...item, quantity: 1 }];
-    });
-    setIsCartOpen(true);
-  };
-
-  const removeFromCart = (itemId: string) => {
-    setCart(prev => prev.filter(i => i.id !== itemId));
-  };
-
-  const updateQuantity = (itemId: string, delta: number) => {
-    setCart(prev => {
-      return prev.map(i => {
-        if (i.id === itemId) {
-          const newQty = i.quantity + delta;
-          return newQty > 0 ? { ...i, quantity: newQty } : i;
-        }
-        return i;
-      });
-    });
-  };
-
-  const clearCart = () => {
-    if (window.confirm("Are you sure you want to cancel your order?")) {
-      setCart([]);
-    }
-  };
-
-  const closeCart = () => {
-    setIsCartOpen(false);
-    if (confirmedOrder) {
-        setTimeout(() => {
-            setConfirmedOrder(null);
-            setCart([]);
-        }, 300);
-    }
-  };
-
-  const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const deliveryCharge = orderType === 'delivery' ? DELIVERY_FEE : 0;
-  const tax = cartTotal * 0.05;
-  const finalTotal = Number((cartTotal + tax + deliveryCharge).toFixed(2));
-
-  const handlePlaceOrder = async () => {
-    if (!customerName || !customerPhone) {
-        alert("Please enter your name and phone number.");
-        return;
-    }
-
-    setIsProcessing(true);
-    
-    const fullPhone = `${customerPhoneCode} ${customerPhone}`;
-
-    // Construct Order Object
-    const newOrder: Order = {
-        id: `ORD-${Date.now().toString().slice(-6)}`,
-        customerName,
-        phoneNumber: fullPhone,
-        items: cart,
-        total: finalTotal,
-        status: 'pending_approval', // Needs Admin Approval
-        timestamp: new Date().toISOString(),
-        type: orderType,
-        paymentMethod: paymentMethod,
-        paymentStatus: paymentMethod === 'online_link' ? 'pending' : 'pending', // In real app, 'card' might be 'paid' instantly
-        deliveryLocation: { lat: 25.2048, lng: 55.2708 } // Mock Location (Downtown Dubai)
-    };
-
-    try {
-        // Simulate Network Delay for Payment Link Generation
-        if (paymentMethod === 'online_link') {
-            await new Promise(resolve => setTimeout(resolve, 1500));
-        }
-
-        const savedOrder = await createOrder(newOrder);
-        setConfirmedOrder(savedOrder);
-    } catch (error) {
-        console.error("Order placement failed", error);
-        alert("Failed to place order. Please try again.");
-    } finally {
-        setIsProcessing(false);
-    }
-  };
-
-  const handleNotifyAdmin = () => {
-    if (confirmedOrder) {
-      const link = generateWhatsAppOrderMessage(confirmedOrder);
-      window.open(link, '_blank');
-    }
-  };
-
-  // --- Review/Expand Functions ---
-  const toggleExpand = (id: string) => {
-    setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
-    if (!activeTab[id]) {
-        setActiveTab(prev => ({...prev, [id]: 'details'}));
-    }
-  };
-
-  const handleRatingClick = (itemId: string, rating: number) => {
-    setRatingInputs(prev => ({ ...prev, [itemId]: rating }));
-  };
-
-  const handleInputChange = (itemId: string, text: string) => {
-    setReviewInputs(prev => ({ ...prev, [itemId]: text }));
-  };
-
-  const handleSubmitReview = (itemId: string) => {
-    const text = reviewInputs[itemId]?.trim();
-    const rating = ratingInputs[itemId] || 5;
-    
-    if (!text) return;
-
-    const newReview: Review = {
-      id: Date.now().toString(),
-      itemId,
-      userName: 'Guest Customer',
-      rating,
-      comment: text,
-      date: new Date().toLocaleDateString()
-    };
-
-    const updatedReviews = {
-      ...reviews,
-      [itemId]: [...(reviews[itemId] || []), newReview]
-    };
-
-    setReviews(updatedReviews);
-    localStorage.setItem('gourmetai_reviews', JSON.stringify(updatedReviews));
-    
-    setReviewInputs(prev => ({ ...prev, [itemId]: '' }));
-    setRatingInputs(prev => ({ ...prev, [itemId]: 5 }));
-  };
-
-  // Filter Logic
   const filteredMenu = menu.filter(item => {
-    const categoryMatch = 
-        activeCat === t('menu_category_all') || 
-        activeCat === 'All' || 
-        item.category.toLowerCase() === activeCat.toLowerCase();
-
-    const searchMatch = 
-        searchTerm === '' ||
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchTerm.toLowerCase());
-
-    return categoryMatch && searchMatch;
+      const matchesCat = activeCat === 'All' || item.category === activeCat;
+      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || item.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesDietary = activeDietary.length === 0 || (item.dietaryLabels && activeDietary.every(label => item.dietaryLabels?.includes(label as any)));
+      return matchesCat && matchesSearch && matchesDietary;
   });
 
-  const renderStars = (rating: number, interactive = false, itemId?: string, setRating?: (r: number) => void) => {
-    return (
-      <div className="flex gap-0.5">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            disabled={!interactive}
-            onClick={() => interactive && itemId && setRating && setRating(star)}
-            className={`${interactive ? 'cursor-pointer hover:scale-110 transition' : 'cursor-default'}`}
-          >
-            <Star 
-              size={interactive ? 20 : 14} 
-              className={`${star <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-stone-300'} ${interactive ? 'stroke-2' : 'stroke-1'}`} 
-            />
-          </button>
-        ))}
-      </div>
-    );
+  // --- Cart Calculations ---
+  // Fix type error: explicit accumulator type
+  const calculateCartTotal = () => {
+      return cart.reduce((acc: number, item) => {
+          const modifiersCost = (item.selectedModifiers || []).reduce((sum: number, m) => sum + m.price, 0);
+          return acc + ((item.price + modifiersCost) * item.quantity);
+      }, 0);
   };
 
-  return (
-    <div className="container mx-auto px-4 md:px-6 py-6 md:py-12 pb-24">
+  const subTotal = calculateCartTotal();
+  const deliveryFee = orderType === 'delivery' ? appConfig.deliveryFee : 0;
+  const tax = subTotal * 0.05;
+  const grandTotal = subTotal + tax + deliveryFee;
+
+  // --- Modal Logic ---
+  const openItemModal = (item: MenuItem, cartIndex?: number) => {
+      setModalItem(item);
       
-      {/* Menu Hero Banner */}
-      <div className="relative bg-stone-900 text-white py-20 md:py-24 mb-12 rounded-3xl overflow-hidden shadow-xl">
-         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550966871-3ed3c6221741?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80')] bg-cover bg-center opacity-40 transform scale-105"></div>
-         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-         <div className="relative z-10 text-center px-4">
-            <h1 className="text-5xl md:text-6xl font-bold mb-4 tracking-tight drop-shadow-2xl">{t('menu_title')}</h1>
-            <p className="text-xl text-stone-200 font-light max-w-2xl mx-auto drop-shadow-lg">{t('menu_subtitle')}</p>
-         </div>
-      </div>
+      if (cartIndex !== undefined && cart[cartIndex]) {
+          // Editing mode: Prefill
+          const cartItem = cart[cartIndex];
+          const selections: Record<string, ModifierOption[]> = {};
+          
+          // Reconstruct selections map from flattened list
+          item.modifierGroups?.forEach(group => {
+              const groupOptions = cartItem.selectedModifiers?.filter(m => group.options.some(o => o.id === m.id)) || [];
+              if (groupOptions.length > 0) selections[group.id] = groupOptions;
+          });
 
-      {/* Controls */}
-      <div className="flex flex-col gap-6 mb-12 max-w-6xl mx-auto">
-        {/* Search Bar */}
-        <div className="relative w-full max-w-md mx-auto">
-            <Search className="absolute left-4 top-3.5 text-stone-400" size={20} />
-            <input 
-                type="text"
-                placeholder={t('menu_search_placeholder')}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-6 py-3.5 rounded-full border border-stone-200 bg-white text-stone-700 focus:ring-2 focus:ring-orange-200 outline-none transition font-medium shadow-sm"
-            />
-        </div>
+          setModalSelections(selections);
+          setModalInstructions(cartItem.specialInstructions || '');
+          setModalQuantity(cartItem.quantity);
+          setEditingCartIndex(cartIndex);
+      } else {
+          // New Item
+          setModalSelections({});
+          setModalInstructions('');
+          setModalQuantity(1);
+          setEditingCartIndex(null);
+      }
+  };
 
-        {/* Category Controls */}
-        <div className="flex justify-center w-full">
-            
-            {/* Mobile Dropdown (Visible only on small screens) */}
-            <div className="relative w-full max-w-xs md:hidden">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500 pointer-events-none">
-                    <Filter size={16} />
-                </div>
-                <select 
-                    value={activeCat}
-                    onChange={(e) => handleCategoryChange(e.target.value)}
-                    className="w-full appearance-none bg-white border border-stone-200 text-stone-700 py-3 pl-10 pr-10 rounded-full font-bold text-sm focus:outline-none focus:ring-2 focus:ring-orange-200 shadow-sm cursor-pointer"
-                >
-                    <option value={t('menu_category_all')}>{t('menu_category_all')}</option>
-                    {uniqueCategories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" size={16} />
-            </div>
+  const handleModifierToggle = (group: ModifierGroup, option: ModifierOption) => {
+      setModalSelections(prev => {
+          const current = prev[group.id] || [];
+          const isSelected = current.some(o => o.id === option.id);
+          
+          if (group.maxSelection === 1) {
+              // Radio behavior
+              return { ...prev, [group.id]: [option] };
+          } else {
+              // Checkbox behavior
+              if (isSelected) {
+                  return { ...prev, [group.id]: current.filter(o => o.id !== option.id) };
+              } else {
+                  if (group.maxSelection && current.length >= group.maxSelection) return prev; // Max limit reached
+                  return { ...prev, [group.id]: [...current, option] };
+              }
+          }
+      });
+  };
 
-            {/* Desktop Pills (Visible only on medium+ screens) */}
-            <div className="hidden md:flex flex-wrap justify-center gap-2 md:gap-4">
-                <button
-                    onClick={() => handleCategoryChange(t('menu_category_all'))}
-                    className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-300 border ${
-                    activeCat === t('menu_category_all') || activeCat === 'All'
-                    ? 'bg-orange-600 text-white border-orange-600 shadow-lg transform scale-105'
-                    : 'bg-white text-stone-600 border-stone-200 hover:border-orange-300 hover:text-orange-600 hover:shadow-sm'
-                    }`}
-                >
-                    {t('menu_category_all')}
-                </button>
-                {uniqueCategories.map((cat: string) => (
-                    <button
-                    key={cat}
-                    onClick={() => handleCategoryChange(cat)}
-                    className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-300 border ${
-                        activeCat === cat
-                        ? 'bg-orange-600 text-white border-orange-600 shadow-lg transform scale-105'
-                        : 'bg-white text-stone-600 border-stone-200 hover:border-orange-300 hover:text-orange-600 hover:shadow-sm'
-                    }`}
-                    >
-                    {cat}
-                    </button>
-                ))}
-            </div>
-        </div>
-      </div>
+  const addToCart = () => {
+      if (!modalItem) return;
 
-      {/* Menu Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {filteredMenu.length === 0 && (
-            <div className="col-span-full text-center py-20 opacity-50">
-                <Utensils size={48} className="mx-auto mb-4 text-stone-300"/>
-                <p className="text-xl font-bold text-stone-400">{t('menu_no_items')}</p>
-                <button onClick={() => {setSearchTerm(''); handleCategoryChange(t('menu_category_all'));}} className="mt-4 text-orange-600 font-bold hover:underline">Clear Filters</button>
-            </div>
-        )}
+      // Validation
+      if (modalItem.modifierGroups) {
+          for (const group of modalItem.modifierGroups) {
+              const selected = modalSelections[group.id] || [];
+              if (group.required && selected.length === 0) {
+                  alert(`Please select a option for "${group.name}"`);
+                  return;
+              }
+              if (group.minSelection && selected.length < group.minSelection) {
+                  alert(`Please select at least ${group.minSelection} options for "${group.name}"`);
+                  return;
+              }
+          }
+      }
 
-        {filteredMenu.map(item => {
-            const itemReviews: Review[] = reviews[item.id] || [];
-            const avgRating = itemReviews.length > 0 
-                ? itemReviews.reduce((acc, r) => acc + r.rating, 0) / itemReviews.length 
-                : 0;
-            const isExpanded = expandedItems[item.id];
-            const isInCart = cart.some(c => c.id === item.id);
-            const currentTab = activeTab[item.id] || 'details';
+      // Flatten selections
+      const flattenedModifiers: ModifierOption[] = Object.values(modalSelections).flat() as ModifierOption[];
 
-            return (
-              <div key={item.id} className={`bg-white rounded-2xl shadow-sm transition-all duration-300 border border-stone-100 overflow-hidden group h-fit ${!item.available ? 'opacity-75' : ''} hover:shadow-xl hover:-translate-y-1`}>
-                {/* Image Area with Zoom Effect */}
-                <div className="relative h-56 overflow-hidden cursor-pointer" onClick={() => toggleExpand(item.id)}>
-                  <img 
-                    src={item.imageUrl} 
-                    alt={item.name} 
-                    className={`w-full h-full object-cover transition-transform duration-700 ${item.available ? 'group-hover:scale-110' : 'grayscale'}`}
-                  />
-                  <div className="absolute top-4 right-4 bg-white/95 backdrop-blur px-4 py-1.5 rounded-full text-base font-bold text-stone-900 shadow-md">
-                    ${item.price}
+      const newItem: CartItem = {
+          ...modalItem,
+          quantity: modalQuantity,
+          selectedModifiers: flattenedModifiers,
+          specialInstructions: modalInstructions
+      };
+
+      setCart(prev => {
+          if (editingCartIndex !== null) {
+              const updated = [...prev];
+              updated[editingCartIndex] = newItem;
+              return updated;
+          }
+          return [...prev, newItem];
+      });
+
+      setModalItem(null); // Close modal
+      setIsCartOpen(true); // Open cart drawer
+  };
+  
+  const removeFromCart = (index: number) => {
+      setCart(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // --- Order Logic ---
+  const handlePlaceOrder = async () => {
+      if (!customerName || !customerPhone) {
+          alert("Please enter your name and phone number.");
+          return;
+      }
+      if (orderType === 'delivery' && !deliveryAddress.trim()) {
+          alert("Please enter a delivery address.");
+          return;
+      }
+
+      setIsProcessing(true);
+      const fullPhone = `${customerPhoneCode} ${customerPhone}`;
+
+      const newOrder: Order = {
+          id: `ORD-${Date.now().toString().slice(-6)}`,
+          customerName,
+          phoneNumber: fullPhone,
+          items: cart,
+          total: Number(grandTotal.toFixed(2)),
+          status: 'pending_approval',
+          timestamp: new Date().toISOString(),
+          type: orderType,
+          paymentMethod: paymentMethod,
+          paymentStatus: 'pending',
+          deliveryAddress: orderType === 'delivery' ? deliveryAddress : undefined,
+          deliveryLocation: { lat: 25.2048, lng: 55.2708 },
+          deliveryStatus: 'pending'
+      };
+
+      try {
+          const savedOrder = await createOrder(newOrder);
+          setConfirmedOrder(savedOrder);
+          
+          // Save to local storage for tracking 'my orders'
+          const myOrders = JSON.parse(localStorage.getItem('my_orders') || '[]');
+          localStorage.setItem('my_orders', JSON.stringify([...myOrders, savedOrder.id]));
+          
+      } catch (error) {
+          console.error("Order placement failed", error);
+          alert("Failed to place order. Please try again.");
+      } finally {
+          setIsProcessing(false);
+      }
+  };
+  
+  // Render Confirmed State
+  if (confirmedOrder) {
+      return (
+          <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+              <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center">
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600 animate-in zoom-in">
+                      <CheckCircle size={40} />
                   </div>
-                  {!item.available && (
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <span className="bg-red-600 text-white px-6 py-2 rounded-full font-bold text-sm uppercase tracking-wider transform -rotate-12 shadow-2xl border-2 border-white">{t('menu_sold_out')}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-2">
-                      <h3 className="text-xl font-bold text-stone-800 flex-1 leading-tight">{item.name}</h3>
-                      {itemReviews.length > 0 && (
-                          <div className="flex items-center gap-1 bg-yellow-50 px-2 py-1 rounded text-xs font-bold text-yellow-700 ml-2 shrink-0">
-                              <Star size={12} className="fill-yellow-700 text-yellow-700"/>
-                              {avgRating.toFixed(1)}
-                          </div>
-                      )}
-                  </div>
+                  <h2 className="text-2xl font-bold text-stone-900 mb-2">{t('chat_order_placed')}</h2>
+                  <p className="text-stone-500 mb-6">Order #{confirmedOrder.id} has been received.</p>
                   
-                  <p className="text-stone-500 text-sm mb-3 line-clamp-2 leading-relaxed">{item.description}</p>
-                  
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-stone-100">
-                    <button 
-                        onClick={() => toggleExpand(item.id)}
-                        className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1 transition ${isExpanded ? 'text-orange-600' : 'text-stone-500 hover:text-stone-800'}`}
-                    >
-                       {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-                       {isExpanded ? "Close Details" : "View Details"}
-                    </button>
-                    
-                    <button 
-                        disabled={!item.available}
-                        onClick={() => addToCart(item)}
-                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 shadow-sm ${
-                            item.available 
-                            ? isInCart ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-stone-900 text-white hover:bg-orange-600 hover:shadow-orange-200'
-                            : 'bg-stone-100 text-stone-400 cursor-not-allowed'
-                        }`}
-                    >
-                      <ShoppingCart size={18} /> {item.available ? (isInCart ? t('cart_update') : t('cart_add')) : t('menu_sold_out')}
-                    </button>
+                  <div className="flex flex-col gap-3">
+                      <button 
+                        onClick={() => navigate(`/tracking/${confirmedOrder.id}`)}
+                        className="w-full bg-stone-900 text-white py-3 rounded-xl font-bold hover:bg-stone-800 transition"
+                      >
+                          {t('chat_track_order')}
+                      </button>
+                      <button 
+                        onClick={() => {
+                            setConfirmedOrder(null);
+                            setCart([]);
+                            setIsCartOpen(false);
+                        }}
+                        className="w-full bg-stone-100 text-stone-600 py-3 rounded-xl font-bold hover:bg-stone-200 transition"
+                      >
+                          Order More
+                      </button>
                   </div>
-
-                  {/* EXPANDED DETAILS SECTION */}
-                  {isExpanded && (
-                    <div className="mt-4 animate-in slide-in-from-top-2 duration-200">
-                        {/* Tabs */}
-                        <div className="flex border-b border-stone-200 mb-4">
-                            <button 
-                                onClick={() => setActiveTab(prev => ({...prev, [item.id]: 'details'}))}
-                                className={`flex-1 pb-2 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${currentTab === 'details' ? 'border-orange-500 text-orange-600' : 'border-transparent text-stone-400 hover:text-stone-600'}`}
-                            >
-                                Product Details
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab(prev => ({...prev, [item.id]: 'reviews'}))}
-                                className={`flex-1 pb-2 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${currentTab === 'reviews' ? 'border-orange-500 text-orange-600' : 'border-transparent text-stone-400 hover:text-stone-600'}`}
-                            >
-                                Reviews ({itemReviews.length})
-                            </button>
-                        </div>
-
-                        {currentTab === 'details' && (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="bg-stone-50 p-3 rounded-lg border border-stone-100 flex items-center gap-2">
-                                        <Flame size={16} className="text-orange-500" />
-                                        <div>
-                                            <p className="text-[10px] text-stone-400 font-bold uppercase">Calories</p>
-                                            <p className="text-sm font-bold text-stone-800">{item.calories || '350'} kcal</p>
-                                        </div>
-                                    </div>
-                                    <div className="bg-stone-50 p-3 rounded-lg border border-stone-100 flex items-center gap-2">
-                                        <Wheat size={16} className="text-yellow-500" />
-                                        <div>
-                                            <p className="text-[10px] text-stone-400 font-bold uppercase">Allergens</p>
-                                            <p className="text-xs font-bold text-stone-800 truncate">
-                                                {item.allergens && item.allergens.length > 0 ? item.allergens.join(', ') : 'None'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {currentTab === 'reviews' && (
-                            <div className="space-y-4">
-                                <div className="space-y-3 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                                    {itemReviews.length === 0 && (
-                                        <p className="text-xs text-stone-400 italic text-center py-4">No reviews yet. Be the first!</p>
-                                    )}
-                                    {itemReviews.map(review => (
-                                        <div key={review.id} className="bg-stone-50 p-3 rounded-lg border border-stone-100">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="font-bold text-xs text-stone-800">{review.userName}</span>
-                                                <span className="text-[10px] text-stone-400">{review.date}</span>
-                                            </div>
-                                            <div className="flex mb-1">
-                                                {renderStars(review.rating)}
-                                            </div>
-                                            <p className="text-xs text-stone-600">{review.comment}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="bg-stone-50 p-3 rounded-lg border border-stone-100">
-                                    <p className="text-xs font-bold text-stone-500 mb-2 uppercase">{t('menu_write_review')}</p>
-                                    <div className="flex mb-2 gap-1">
-                                        {renderStars(ratingInputs[item.id] || 5, true, item.id, (r) => handleRatingClick(item.id, r))}
-                                    </div>
-                                    <textarea
-                                        className="w-full p-2 text-xs border rounded bg-white mb-2 focus:ring-1 focus:ring-orange-200 outline-none resize-none"
-                                        placeholder="Share your experience..."
-                                        value={reviewInputs[item.id] || ''}
-                                        onChange={(e) => handleInputChange(item.id, e.target.value)}
-                                    />
-                                    <button 
-                                        onClick={() => handleSubmitReview(item.id)}
-                                        className="w-full bg-stone-800 text-white py-1.5 rounded text-xs font-bold hover:bg-stone-700 transition"
-                                    >
-                                        {t('menu_submit_review')}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                  )}
-                </div>
               </div>
-            );
-        })}
+          </div>
+      );
+  }
+
+  return (
+    <div className="min-h-screen bg-stone-50 pb-32"> {/* Increased padding bottom for sticky footer */}
+      {/* 1. Header & Search Bar */}
+      <div className="bg-white sticky top-20 z-10 shadow-sm border-b border-stone-100">
+          <div className="max-w-6xl mx-auto px-6 py-4">
+              <h1 className="text-2xl font-bold text-stone-900 mb-4">{t('menu_title')}</h1>
+              <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={20}/>
+                  <input 
+                    type="text" 
+                    placeholder={t('menu_search_placeholder')}
+                    value={searchTerm}
+                    onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setSearchParams(prev => {
+                            prev.set('search', e.target.value);
+                            return prev;
+                        });
+                    }}
+                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-200 outline-none transition"
+                  />
+              </div>
+              
+              {/* Category Pills */}
+              <div className="flex gap-2 mt-4 overflow-x-auto pb-2 scrollbar-hide">
+                  {uniqueCategories.map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setActiveCat(cat)}
+                        className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition border ${
+                            activeCat === cat 
+                            ? 'bg-stone-900 text-white border-stone-900' 
+                            : 'bg-white text-stone-600 border-stone-200 hover:border-orange-300'
+                        }`}
+                      >
+                          {cat}
+                      </button>
+                  ))}
+              </div>
+          </div>
       </div>
 
-      {/* CART DRAWER / CHECKOUT */}
-      {isCartOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end">
-             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeCart}></div>
-             <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-                <div className="bg-stone-900 text-white p-6 flex justify-between items-center shadow-md z-10 shrink-0">
-                    <h2 className="text-xl font-bold flex items-center gap-2"><ShoppingCart className="text-orange-500"/> {confirmedOrder ? 'Order Placed' : t('cart_title')}</h2>
-                    <button onClick={closeCart} className="hover:text-orange-500 transition"><X size={24}/></button>
+      {/* 2. Menu Grid */}
+      <div className="max-w-6xl mx-auto px-6 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredMenu.map(item => (
+                  <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden hover:shadow-md transition group h-full flex flex-col">
+                      <div className="relative h-48 overflow-hidden">
+                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover transition duration-700 group-hover:scale-110"/>
+                          {!item.available && (
+                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                  <span className="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold uppercase">{t('menu_sold_out')}</span>
+                              </div>
+                          )}
+                          <div className="absolute bottom-2 right-2 flex gap-1">
+                              {item.dietaryLabels?.map(label => (
+                                  <span key={label} className="bg-white/90 backdrop-blur px-2 py-1 rounded text-[10px] font-bold text-stone-800">{label}</span>
+                              ))}
+                          </div>
+                      </div>
+                      <div className="p-5 flex-1 flex flex-col">
+                          <div className="flex justify-between items-start mb-2">
+                              <h3 className="font-bold text-lg text-stone-900">{item.name}</h3>
+                              <span className="font-bold text-lg text-orange-600">${item.price}</span>
+                          </div>
+                          <p className="text-stone-500 text-sm mb-4 line-clamp-2 flex-1">{item.description}</p>
+                          
+                          <button 
+                            onClick={() => openItemModal(item)}
+                            disabled={!item.available}
+                            className="w-full mt-auto py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 bg-stone-100 text-stone-900 hover:bg-stone-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              <Plus size={16}/> {item.available ? t('cart_add') : 'Unavailable'}
+                          </button>
+                      </div>
+                  </div>
+              ))}
+          </div>
+          
+          {filteredMenu.length === 0 && (
+              <div className="text-center py-20 text-stone-400">
+                  <Utensils size={48} className="mx-auto mb-4 opacity-20"/>
+                  <p>{t('menu_no_items')}</p>
+              </div>
+          )}
+      </div>
+
+      {/* 3. Sticky Footer for Cart */}
+      {cart.length > 0 && !isCartOpen && (
+          <div className="fixed bottom-0 left-0 right-0 p-4 z-40 bg-white border-t border-stone-200 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] md:hidden">
+              <div className="flex items-center justify-between gap-4">
+                  <div onClick={() => setIsCartOpen(true)} className="flex-1 cursor-pointer">
+                      <p className="text-xs font-bold text-stone-500 uppercase">{cart.length} Items</p>
+                      <p className="text-lg font-black text-stone-900">${grandTotal.toFixed(2)}</p>
+                  </div>
+                  <button 
+                    onClick={() => setIsCartOpen(true)}
+                    className="bg-stone-900 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2"
+                  >
+                      View Cart <ArrowRight size={16}/>
+                  </button>
+              </div>
+          </div>
+      )}
+      
+      {/* Desktop Floating Action Button (Alternative to sticky footer) */}
+       {cart.length > 0 && !isCartOpen && (
+          <button 
+            onClick={() => setIsCartOpen(true)}
+            className="hidden md:flex fixed bottom-8 right-8 bg-stone-900 text-white p-4 rounded-full shadow-2xl z-40 hover:scale-105 transition items-center gap-3 pr-6"
+          >
+              <div className="relative">
+                  <ShoppingCart size={24} />
+                  <span className="absolute -top-2 -right-2 w-5 h-5 bg-orange-600 rounded-full text-[10px] font-bold flex items-center justify-center border-2 border-stone-900">
+                      {cart.reduce((a, b) => a + b.quantity, 0)}
+                  </span>
+              </div>
+              <span className="font-bold">${grandTotal.toFixed(2)}</span>
+          </button>
+      )}
+
+      {/* 4. Menu Footer */}
+      <footer className="mt-20 border-t border-stone-200 bg-white py-12 px-6">
+          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 text-center md:text-left">
+              {/* Assurance */}
+              <div className="flex flex-col items-center md:items-start gap-4">
+                  <div className="flex gap-2 text-stone-300">
+                      {/* Visual representations of cards */}
+                      <div className="w-8 h-5 bg-stone-200 rounded"></div>
+                      <div className="w-8 h-5 bg-stone-200 rounded"></div>
+                      <div className="w-8 h-5 bg-stone-200 rounded"></div>
+                  </div>
+                  <p className="text-xs font-bold text-stone-500 flex items-center gap-1">
+                      <Lock size={12}/> 100% Secure Checkout
+                  </p>
+              </div>
+
+              {/* Logistics */}
+              <div className="space-y-2">
+                  <h4 className="font-bold text-stone-900 text-sm">Logistics</h4>
+                  <ul className="text-xs text-stone-500 space-y-1">
+                      <li><Link to="/info/location" className="hover:text-orange-600">Check Delivery Area</Link></li>
+                      <li><a href="#" className="hover:text-orange-600">Allergy Guide</a></li>
+                      <li><Link to="/info/faq" className="hover:text-orange-600">Pickup FAQs</Link></li>
+                  </ul>
+              </div>
+
+              {/* Contact */}
+              <div className="space-y-2">
+                  <h4 className="font-bold text-stone-900 text-sm">Need Help?</h4>
+                  <div className="flex flex-col gap-2">
+                      <button onClick={() => window.dispatchEvent(new CustomEvent('open-chat-widget'))} className="text-xs font-bold text-blue-600 border border-blue-100 bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition">
+                          Chat with Us
+                      </button>
+                      <a href="tel:+971504291207" className="text-xs font-bold text-stone-600 border border-stone-100 bg-stone-50 px-3 py-2 rounded-lg hover:bg-stone-100 transition block text-center">
+                          Call Support
+                      </a>
+                  </div>
+              </div>
+              
+              {/* Legal */}
+              <div className="space-y-2">
+                   <h4 className="font-bold text-stone-900 text-sm">Legal</h4>
+                   <ul className="text-xs text-stone-500 space-y-1">
+                       <li><a href="#" className="hover:text-stone-800">Privacy Policy</a></li>
+                       <li><a href="#" className="hover:text-stone-800">Terms of Service</a></li>
+                       <li>&copy; 2025 Stanley's</li>
+                   </ul>
+              </div>
+          </div>
+      </footer>
+
+      {/* 5. Item Customization Modal */}
+      {modalItem && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4 animate-in fade-in">
+            <div className="bg-white w-full max-w-lg rounded-t-3xl md:rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10">
+                <div className="sticky top-0 bg-white z-10 p-4 border-b border-stone-100 flex justify-between items-center">
+                    <h3 className="font-bold text-lg">{modalItem.name}</h3>
+                    <button onClick={() => setModalItem(null)} className="p-2 bg-stone-100 rounded-full hover:bg-stone-200"><X size={20}/></button>
                 </div>
                 
-                {confirmedOrder ? (
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-300 bg-stone-50">
-                        <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-green-100">
-                            <CheckCircle size={64} className="animate-bounce" />
+                <div className="p-6">
+                    <div className="flex gap-4 mb-6">
+                        <img src={modalItem.imageUrl} className="w-24 h-24 rounded-xl object-cover" alt={modalItem.name}/>
+                        <div>
+                            <p className="text-stone-500 text-sm mb-2">{modalItem.description}</p>
+                            <p className="font-bold text-xl text-orange-600">${modalItem.price}</p>
                         </div>
-                        <h3 className="text-2xl font-bold text-stone-800 mb-2">Order Pending Approval!</h3>
-                        <p className="text-stone-500 mb-8 max-w-xs leading-relaxed">
-                            Your order <span className="font-mono font-bold text-stone-800">#{confirmedOrder.id}</span> has been sent to the kitchen.
-                        </p>
+                    </div>
 
-                        {/* WhatsApp Notification Button */}
-                        <button 
-                            onClick={handleNotifyAdmin}
-                            className="w-full bg-green-500 hover:bg-green-600 text-white p-4 rounded-xl font-bold shadow-lg mb-6 flex items-center justify-center gap-3 transition-all hover:-translate-y-1"
-                        >
-                            <MessageCircle size={24} className="fill-white text-white" />
-                            <div className="text-left">
-                                <div className="text-sm leading-none">Notify Restaurant</div>
-                                <div className="text-xs font-normal opacity-90">Send Order via WhatsApp</div>
+                    {modalItem.modifierGroups?.map(group => (
+                        <div key={group.id} className="mb-6">
+                            <div className="flex justify-between mb-2">
+                                <h4 className="font-bold text-stone-800">{group.name}</h4>
+                                <span className="text-xs font-bold bg-stone-100 text-stone-500 px-2 py-1 rounded">
+                                    {group.required ? 'Required' : 'Optional'}
+                                </span>
                             </div>
-                        </button>
-
-                        {confirmedOrder.paymentLink && (
-                            <div className="w-full bg-white p-4 rounded-xl border border-blue-200 mb-6 text-left">
-                                <p className="text-xs font-bold text-blue-600 uppercase mb-2 flex items-center gap-2">
-                                    <LinkIcon size={14}/> Payment Link
-                                </p>
-                                <div className="flex gap-2">
-                                    <input type="text" readOnly value={confirmedOrder.paymentLink} className="flex-1 text-xs bg-blue-50 p-2 rounded border border-blue-100 text-stone-500" />
-                                    <button className="text-xs bg-blue-600 text-white px-3 rounded font-bold">Pay</button>
-                                </div>
+                            <div className="space-y-2">
+                                {group.options.map(option => {
+                                    const isSelected = (modalSelections[group.id] || []).some(o => o.id === option.id);
+                                    return (
+                                        <div 
+                                            key={option.id}
+                                            onClick={() => handleModifierToggle(group, option)}
+                                            className={`flex justify-between items-center p-3 rounded-xl border cursor-pointer transition ${
+                                                isSelected 
+                                                ? 'border-orange-500 bg-orange-50' 
+                                                : 'border-stone-200 hover:border-stone-300'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                                                    isSelected ? 'border-orange-500' : 'border-stone-300'
+                                                }`}>
+                                                    {isSelected && <div className="w-2.5 h-2.5 bg-orange-500 rounded-full"></div>}
+                                                </div>
+                                                <span className={`text-sm ${isSelected ? 'font-bold text-stone-900' : 'text-stone-600'}`}>{option.name}</span>
+                                            </div>
+                                            {option.price > 0 && <span className="text-sm font-medium text-stone-500">+${option.price}</span>}
+                                        </div>
+                                    )
+                                })}
                             </div>
-                        )}
-
-                        <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-stone-200 space-y-4 mb-8">
-                             <div className="flex justify-between items-center pb-4 border-b border-stone-100">
-                                <span className="text-sm text-stone-500">Total Amount</span>
-                                <span className="text-2xl font-bold text-stone-900">${confirmedOrder.total}</span>
-                             </div>
-                             <div className="flex justify-between items-center">
-                                <span className="text-sm text-stone-500">Payment</span>
-                                <span className="text-sm font-bold text-stone-900 uppercase">{confirmedOrder.paymentMethod.replace('_', ' ')}</span>
-                             </div>
-                             <div className="flex justify-between items-center">
-                                <span className="text-sm text-stone-500">Status</span>
-                                <span className="text-sm font-bold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">Pending</span>
-                             </div>
                         </div>
+                    ))}
 
+                    <div className="mb-6">
+                         <h4 className="font-bold text-stone-800 mb-2">Special Instructions</h4>
+                         <textarea 
+                            value={modalInstructions}
+                            onChange={(e) => setModalInstructions(e.target.value)}
+                            placeholder="Allergies, extra spicy, etc."
+                            className="w-full p-3 border border-stone-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-200 outline-none"
+                         />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4 pt-4 border-t border-stone-100">
+                        <div className="flex items-center gap-3 bg-stone-100 rounded-xl p-1">
+                            <button onClick={() => setModalQuantity(Math.max(1, modalQuantity - 1))} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm font-bold hover:bg-stone-50">-</button>
+                            <span className="font-bold w-4 text-center">{modalQuantity}</span>
+                            <button onClick={() => setModalQuantity(modalQuantity + 1)} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm font-bold hover:bg-stone-50">+</button>
+                        </div>
                         <button 
-                            onClick={() => navigate(`/tracking/${confirmedOrder.id}`)}
-                            className="px-8 py-3 bg-orange-600 text-white rounded-xl font-bold shadow-lg hover:bg-orange-700 transition w-full mb-3 flex items-center justify-center gap-2"
+                            onClick={addToCart}
+                            className="flex-1 bg-stone-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-stone-800 transition"
                         >
-                            <Bike size={20}/> Track Order Live
-                        </button>
-                        <button 
-                            onClick={closeCart}
-                            className="px-8 py-3 bg-stone-200 text-stone-600 rounded-xl font-bold shadow-sm hover:bg-stone-300 transition w-full"
-                        >
-                            Close Window
+                            {editingCartIndex !== null ? 'Update Item' : 'Add to Order'} - ${(
+                                (modalItem.price + Object.values(modalSelections).flat().reduce((a:any, b:any) => a + b.price, 0)) * modalQuantity
+                            ).toFixed(2)}
                         </button>
                     </div>
-                ) : (
-                    <>
-                        <div className="flex-1 overflow-y-auto p-6 bg-stone-50/50">
-                            {cart.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center text-stone-400 opacity-60">
-                                    <ShoppingBag size={64} className="mb-4"/>
-                                    <p>{t('cart_empty')}</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    
-                                    {/* Order Type Selector */}
-                                    <div className="bg-white p-1 rounded-xl border border-stone-200 shadow-sm flex mb-4 sticky top-0 z-10">
-                                        <button 
-                                            onClick={() => setOrderType('dine-in')}
-                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 ${orderType === 'dine-in' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:bg-stone-50'}`}
-                                        >
-                                            <Utensils size={14}/> Dine-In
-                                        </button>
-                                        <button 
-                                            onClick={() => setOrderType('pickup')}
-                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 ${orderType === 'pickup' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:bg-stone-50'}`}
-                                        >
-                                            <Store size={14}/> Pickup
-                                        </button>
-                                        <button 
-                                            onClick={() => setOrderType('delivery')}
-                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 ${orderType === 'delivery' ? 'bg-stone-900 text-white shadow-md' : 'text-stone-500 hover:bg-stone-50'}`}
-                                        >
-                                            <Bike size={14}/> Delivery
-                                        </button>
-                                    </div>
+                </div>
+            </div>
+        </div>
+      )}
 
-                                    {cart.map(item => (
-                                        <div key={item.id} className="flex gap-4 items-center bg-white p-3 rounded-xl border border-stone-100 shadow-sm">
-                                            <div className="relative">
-                                                <img src={item.imageUrl} alt="" className="w-16 h-16 rounded-lg object-cover bg-stone-100"/>
-                                                <div className="absolute -top-2 -right-2 bg-orange-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white">
-                                                    {item.quantity}
-                                                </div>
-                                            </div>
-                                            <div className="flex-1">
-                                                <h4 className="font-bold text-stone-800 text-sm line-clamp-1">{item.name}</h4>
-                                                <p className="text-stone-500 text-xs mb-2">${item.price.toFixed(2)}</p>
-                                                <div className="flex items-center gap-3">
-                                                    <button onClick={() => updateQuantity(item.id, -1)} className="w-6 h-6 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 text-sm transition">-</button>
-                                                    <button onClick={() => updateQuantity(item.id, 1)} className="w-6 h-6 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 text-sm transition">+</button>
-                                                </div>
-                                            </div>
-                                            <button onClick={() => removeFromCart(item.id)} className="text-stone-300 hover:text-red-500 p-2 transition"><Trash2 size={16}/></button>
-                                        </div>
+      {/* 6. Cart Drawer / Checkout */}
+      {isCartOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white w-full max-w-md h-full shadow-2xl overflow-y-auto animate-in slide-in-from-right flex flex-col">
+                <div className="p-4 border-b border-stone-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                    <h2 className="font-bold text-lg flex items-center gap-2"><ShoppingBag size={20}/> Your Order</h2>
+                    <button onClick={() => setIsCartOpen(false)} className="p-2 bg-stone-100 rounded-full hover:bg-stone-200"><X size={20}/></button>
+                </div>
+                
+                <div className="flex-1 p-6 space-y-6">
+                    {cart.map((item, idx) => (
+                        <div key={idx} className="flex gap-4">
+                            <div className="w-16 h-16 rounded-xl bg-stone-100 shrink-0 overflow-hidden">
+                                <img src={item.imageUrl} className="w-full h-full object-cover" alt=""/>
+                            </div>
+                            <div className="flex-1">
+                                <div className="flex justify-between items-start">
+                                    <h4 className="font-bold text-stone-900 text-sm">{item.name}</h4>
+                                    <span className="font-bold text-sm text-stone-900">${(item.price * item.quantity).toFixed(2)}</span>
+                                </div>
+                                {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                                    <p className="text-xs text-stone-500 mt-1">{item.selectedModifiers.map(m => m.name).join(', ')}</p>
+                                )}
+                                <div className="flex items-center gap-4 mt-2">
+                                    <div className="flex items-center gap-2 text-xs font-bold bg-stone-50 px-2 py-1 rounded">
+                                        <span>Qty: {item.quantity}</span>
+                                    </div>
+                                    <button onClick={() => openItemModal(item, idx)} className="text-xs font-bold text-blue-600 hover:underline">Edit</button>
+                                    <button onClick={() => removeFromCart(idx)} className="text-stone-400 hover:text-red-500"><Trash2 size={14}/></button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    
+                    {cart.length === 0 && (
+                        <div className="text-center py-20 text-stone-400">Your cart is empty</div>
+                    )}
+
+                    <div className="border-t border-stone-100 pt-6 space-y-4">
+                        <h3 className="font-bold text-sm text-stone-900">Checkout Details</h3>
+                        
+                        {/* Order Type */}
+                        <div className="grid grid-cols-3 gap-2 bg-stone-100 p-1 rounded-xl">
+                            {(['delivery', 'pickup', 'dine-in'] as OrderType[]).map(type => (
+                                <button
+                                    key={type}
+                                    onClick={() => setOrderType(type)}
+                                    className={`py-2 rounded-lg text-xs font-bold capitalize transition ${
+                                        orderType === type ? 'bg-white shadow text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                                    }`}
+                                >
+                                    {type}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {/* Customer Info */}
+                        <div className="space-y-3">
+                            <input 
+                                type="text" 
+                                placeholder="Your Name"
+                                value={customerName}
+                                onChange={e => setCustomerName(e.target.value)}
+                                className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-200"
+                            />
+                            <div className="flex gap-2">
+                                <select 
+                                    className="p-3 bg-stone-50 border border-stone-200 rounded-xl text-sm outline-none"
+                                    value={customerPhoneCode}
+                                    onChange={e => setCustomerPhoneCode(e.target.value)}
+                                >
+                                    {COUNTRY_CODES.map(c => (
+                                        <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
                                     ))}
-
-                                    {/* Customer Info */}
-                                    <div className="mt-6 bg-white p-4 rounded-xl border border-stone-200">
-                                        <h3 className="font-bold text-sm text-stone-800 mb-3 flex items-center gap-2"><User size={16}/> Customer Details</h3>
-                                        <div className="space-y-3">
-                                            <input 
-                                                type="text" 
-                                                placeholder="Full Name"
-                                                className="w-full p-2 bg-stone-50 border border-stone-200 rounded text-sm outline-none focus:border-orange-300"
-                                                value={customerName}
-                                                onChange={e => setCustomerName(e.target.value)}
-                                            />
-                                            <div className="flex gap-2">
-                                                <select 
-                                                    className="p-2 bg-stone-50 border border-stone-200 rounded text-sm outline-none focus:border-orange-300"
-                                                    value={customerPhoneCode}
-                                                    onChange={e => setCustomerPhoneCode(e.target.value)}
-                                                >
-                                                    {COUNTRY_CODES.map(c => (
-                                                        <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
-                                                    ))}
-                                                </select>
-                                                <input 
-                                                    type="tel" 
-                                                    placeholder="Phone Number"
-                                                    className="flex-1 p-2 bg-stone-50 border border-stone-200 rounded text-sm outline-none focus:border-orange-300"
-                                                    value={customerPhone}
-                                                    onChange={e => setCustomerPhone(e.target.value)}
-                                                />
-                                            </div>
-                                            {orderType === 'delivery' && (
-                                                <div className="flex items-center gap-2 bg-stone-50 p-2 rounded border border-stone-200">
-                                                    <MapPin size={16} className="text-stone-400" />
-                                                    <span className="text-xs text-stone-500 italic">Downtown Dubai, UAE (Default)</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                                </select>
+                                <input 
+                                    type="tel" 
+                                    placeholder="Phone Number"
+                                    value={customerPhone}
+                                    onChange={e => setCustomerPhone(e.target.value)}
+                                    className="flex-1 p-3 bg-stone-50 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-200"
+                                />
+                            </div>
+                            {orderType === 'delivery' && (
+                                <textarea 
+                                    placeholder="Delivery Address (Building, Street, Area)"
+                                    value={deliveryAddress}
+                                    onChange={e => setDeliveryAddress(e.target.value)}
+                                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-200 h-24 resize-none"
+                                />
                             )}
                         </div>
 
-                        {cart.length > 0 && (
-                            <div className="p-6 border-t border-stone-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] shrink-0 z-20 overflow-y-auto max-h-[50vh]">
-                                
-                                {/* Payment Method */}
-                                <div className="mb-4">
-                                    <h3 className="font-bold text-xs text-stone-500 uppercase mb-2">Payment</h3>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setPaymentMethod('cash')} className={`flex-1 p-2 rounded-lg border text-xs font-bold flex flex-col items-center gap-1 ${paymentMethod === 'cash' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-stone-200 text-stone-500'}`}>
-                                            <Banknote size={16}/> Cash
-                                        </button>
-                                        <button onClick={() => setPaymentMethod('card')} className={`flex-1 p-2 rounded-lg border text-xs font-bold flex flex-col items-center gap-1 ${paymentMethod === 'card' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-stone-200 text-stone-500'}`}>
-                                            <CreditCard size={16}/> Card
-                                        </button>
-                                        <button onClick={() => setPaymentMethod('online_link')} className={`flex-1 p-2 rounded-lg border text-xs font-bold flex flex-col items-center gap-1 ${paymentMethod === 'online_link' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-stone-200 text-stone-500'}`}>
-                                            <LinkIcon size={16}/> Link
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Totals */}
-                                <div className="space-y-2 mb-6 border-t border-stone-100 pt-4">
-                                    <div className="flex justify-between text-stone-500 text-xs">
-                                        <span>Subtotal</span>
-                                        <span>${cartTotal.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-stone-500 text-xs">
-                                        <span>Taxes (5%)</span>
-                                        <span>${tax.toFixed(2)}</span>
-                                    </div>
-                                    {orderType === 'delivery' && (
-                                        <div className="flex justify-between text-stone-800 text-xs font-bold bg-stone-100 px-2 py-1 rounded">
-                                            <span>Delivery Fee</span>
-                                            <span>${DELIVERY_FEE.toFixed(2)}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between items-center pt-2 border-t border-stone-100">
-                                        <span className="text-stone-800 font-bold">Total</span>
-                                        <span className="text-2xl font-bold text-orange-600">${finalTotal.toFixed(2)}</span>
-                                    </div>
-                                </div>
-                                
-                                {/* Actions */}
-                                <div className="grid grid-cols-3 gap-3 mb-4">
-                                    <button onClick={clearCart} className="col-span-1 py-3 rounded-xl border border-red-100 bg-red-50 text-red-500 font-bold text-sm hover:bg-red-100 transition flex flex-col items-center justify-center">
-                                        <span className="text-[10px] font-normal">Cancel</span>
-                                    </button>
-                                    <button 
-                                        onClick={handlePlaceOrder} 
-                                        disabled={isProcessing}
-                                        className="col-span-2 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm hover:bg-stone-800 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-70"
+                         {/* Payment Method */}
+                         <div>
+                            <h3 className="font-bold text-xs uppercase text-stone-500 mb-2">Payment Method</h3>
+                            <div className="grid grid-cols-3 gap-2">
+                                {[
+                                    { id: 'cash', label: 'Cash', icon: Banknote },
+                                    { id: 'card', label: 'Card', icon: CreditCard },
+                                    { id: 'online_link', label: 'Pay Link', icon: LinkIcon },
+                                ].map(pm => (
+                                    <button
+                                        key={pm.id}
+                                        onClick={() => setPaymentMethod(pm.id as any)}
+                                        className={`flex flex-col items-center justify-center py-3 rounded-xl border transition ${
+                                            paymentMethod === pm.id 
+                                            ? 'border-orange-500 bg-orange-50 text-orange-700' 
+                                            : 'border-stone-200 text-stone-500 hover:bg-stone-50'
+                                        }`}
                                     >
-                                        {isProcessing ? <Loader2 className="animate-spin"/> : <CheckCircle size={20} className="text-green-400"/>} 
-                                        <span>{isProcessing ? "Processing..." : "Confirm Order"}</span>
+                                        <pm.icon size={18} className="mb-1"/>
+                                        <span className="text-xs font-bold">{pm.label}</span>
                                     </button>
-                                </div>
+                                ))}
                             </div>
-                        )}
-                    </>
-                )}
-             </div>
-          </div>
+                         </div>
+                    </div>
+                </div>
+
+                <div className="p-6 bg-stone-50 border-t border-stone-200 sticky bottom-0">
+                    <div className="space-y-2 mb-4">
+                         <div className="flex justify-between text-sm text-stone-500">
+                             <span>Subtotal</span>
+                             <span>${subTotal.toFixed(2)}</span>
+                         </div>
+                         <div className="flex justify-between text-sm text-stone-500">
+                             <span>Tax (5%)</span>
+                             <span>${tax.toFixed(2)}</span>
+                         </div>
+                         {orderType === 'delivery' && (
+                             <div className="flex justify-between text-sm text-stone-500">
+                                 <span>Delivery Fee</span>
+                                 <span>${deliveryFee.toFixed(2)}</span>
+                             </div>
+                         )}
+                         <div className="flex justify-between text-xl font-bold text-stone-900 pt-2 border-t border-stone-200">
+                             <span>Total</span>
+                             <span>${grandTotal.toFixed(2)}</span>
+                         </div>
+                    </div>
+                    
+                    <button 
+                        onClick={handlePlaceOrder}
+                        disabled={isProcessing || cart.length === 0}
+                        className="w-full bg-stone-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-stone-800 transition disabled:opacity-70 flex items-center justify-center gap-2"
+                    >
+                        {isProcessing ? <Loader2 className="animate-spin" /> : t('cart_checkout')}
+                    </button>
+                </div>
+            </div>
+        </div>
       )}
     </div>
   );

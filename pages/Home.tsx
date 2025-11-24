@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChefHat, MessageCircle, Smartphone, Clock, Calendar, ShoppingBag, Utensils, Star, ShieldCheck, Heart, Award, Quote, ChevronRight } from 'lucide-react';
+import { ArrowRight, ChefHat, MessageCircle, Clock, Calendar, ShoppingBag, Utensils, Star, ShieldCheck, Heart, Award, Quote, ChevronRight, Phone, Facebook, Instagram, Twitter, Linkedin, MapPin, Mail, CreditCard, Navigation } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 // 3 Specific High Quality Slides
 const BACKGROUND_IMAGES = [
-  "https://images.unsplash.com/photo-1544148103-0773bf10d330?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80", // Dark Moody Plating
-  "https://images.unsplash.com/photo-1504754524776-3f4f30440be4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80", // Vibrant Table Spread
-  "https://images.unsplash.com/photo-1504674900247-0877df9cc836?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80"  // Chef Action
+  "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80", // Restaurant Interior / Atmosphere
+  "https://images.unsplash.com/photo-1556910103-1c02745a30bf?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80", // Chef Action / Kitchen
+  "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80"  // Plated Food / Culinary
 ];
 
 const Home: React.FC = () => {
@@ -24,88 +24,60 @@ const Home: React.FC = () => {
 
   return (
     <div>
-      {/* Hero Section - Refined for Value Proposition & Aesthetics */}
-      <div className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden bg-stone-900">
+      {/* Hero Section - Light Blue Theme */}
+      <div className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden bg-sky-50">
         
-        {/* Background Slider */}
+        {/* Background Slider - Low Opacity to blend with light theme */}
         {BACKGROUND_IMAGES.map((img, index) => (
           <div 
             key={index}
-            className={`absolute inset-0 bg-cover bg-center transition-all duration-[2000ms] ease-in-out transform ${
-              index === bgIndex ? 'opacity-60 scale-105' : 'opacity-0 scale-100'
+            className={`absolute inset-0 bg-cover bg-center transition-opacity duration-[2000ms] ease-in-out ${
+              index === bgIndex ? 'opacity-30' : 'opacity-0'
             }`}
             style={{ backgroundImage: `url('${img}')` }}
           />
         ))}
 
-        {/* Gradient Overlay for Text Contrast (Dark Mode) */}
-        <div className="absolute inset-0 bg-gradient-to-b from-stone-900/90 via-stone-900/40 to-stone-900/90 z-10"></div>
+        {/* Light Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-sky-50/80 via-sky-50/50 to-sky-50/90 z-10"></div>
         
-        <div className="relative z-20 max-w-5xl mx-auto px-6 text-center text-white mt-10">
+        <div className="relative z-20 max-w-5xl mx-auto px-6 text-center mt-10">
           
-          {/* Trust Badge */}
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 mb-8 animate-in fade-in slide-in-from-bottom-4 shadow-lg">
-             <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-             </span>
-             <span className="text-xs font-bold tracking-widest uppercase text-stone-200">AI-Powered Dining Experience</span>
-          </div>
-
           {/* Headline: Clear Value Prop */}
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[0.95] animate-in fade-in slide-in-from-bottom-6 delay-100 drop-shadow-2xl">
-             The Future of <br/>
-             <span className="text-transparent bg-clip-text bg-gradient-to-br from-orange-400 via-orange-300 to-amber-200">Fine Dining.</span>
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[0.95] animate-in fade-in slide-in-from-bottom-6 delay-100 text-slate-900">
+             {t('hero_headline_prefix')} <br/>
+             <span className="text-transparent bg-clip-text bg-gradient-to-br from-blue-600 via-sky-500 to-teal-400">{t('hero_headline_highlight')}</span>
           </h1>
 
           {/* Subheadline: Why Buy? */}
-          <p className="text-lg md:text-xl text-stone-300 max-w-2xl mx-auto mb-10 leading-relaxed font-light animate-in fade-in slide-in-from-bottom-6 delay-200 drop-shadow-md">
-             Stanley's combines <strong>Michelin-star culinary artistry</strong> with seamless <strong>AI service</strong>. 
-             Order instantly via WhatsApp or our Web App and experience the perfect blend of tradition and technology.
+          <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed font-light animate-in fade-in slide-in-from-bottom-6 delay-200">
+             {t('hero_description')}
           </p>
           
-          {/* CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-5 animate-in fade-in slide-in-from-bottom-8 delay-300 w-full sm:w-auto">
-            <Link 
-                to="/menu" 
-                className="group w-full sm:w-auto px-8 py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-full font-bold text-lg transition-all duration-300 shadow-[0_0_20px_rgba(234,88,12,0.3)] hover:shadow-[0_0_30px_rgba(234,88,12,0.5)] hover:-translate-y-1 flex items-center justify-center gap-2"
-            >
-               <span>Start Order</span>
-               <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform"/>
-            </Link>
-            
-            <Link 
-                to="/info/about" 
-                className="w-full sm:w-auto px-8 py-4 bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/20 rounded-full font-bold text-lg transition-all duration-300 flex items-center justify-center gap-2 text-white hover:border-white/40"
-            >
-              <span>Our Story</span>
-            </Link>
-          </div>
-
           {/* Scannable Key Benefits */}
-          <div className="mt-16 pt-10 border-t border-white/10 grid grid-cols-3 gap-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-10 delay-500">
+          <div className="mt-16 pt-10 border-t border-slate-200 grid grid-cols-3 gap-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-10 delay-500">
               <div className="flex flex-col items-center group">
-                 <div className="mb-3 p-3 bg-stone-800/50 rounded-2xl border border-white/10 group-hover:border-orange-500/50 transition-colors backdrop-blur-sm">
-                     <ChefHat size={24} className="text-orange-400" />
+                 <div className="mb-3 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm group-hover:border-blue-500/50 transition-colors">
+                     <ChefHat size={24} className="text-blue-600" />
                  </div>
-                 <h3 className="font-bold text-sm md:text-base text-white">Chef Curated</h3>
-                 <p className="text-xs text-stone-400 mt-1 hidden md:block">Exquisite recipes & ingredients</p>
+                 <h3 className="font-bold text-sm md:text-base text-slate-800">{t('benefit_chef')}</h3>
+                 <p className="text-xs text-slate-500 mt-1 hidden md:block">{t('benefit_chef_desc')}</p>
               </div>
               
               <div className="flex flex-col items-center group">
-                 <div className="mb-3 p-3 bg-stone-800/50 rounded-2xl border border-white/10 group-hover:border-green-500/50 transition-colors backdrop-blur-sm">
-                     <Clock size={24} className="text-green-400" />
+                 <div className="mb-3 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm group-hover:border-green-500/50 transition-colors">
+                     <Clock size={24} className="text-green-600" />
                  </div>
-                 <h3 className="font-bold text-sm md:text-base text-white">Instant Service</h3>
-                 <p className="text-xs text-stone-400 mt-1 hidden md:block">No waiting, just dining</p>
+                 <h3 className="font-bold text-sm md:text-base text-slate-800">{t('benefit_instant')}</h3>
+                 <p className="text-xs text-slate-500 mt-1 hidden md:block">{t('benefit_instant_desc')}</p>
               </div>
               
               <div className="flex flex-col items-center group">
-                 <div className="mb-3 p-3 bg-stone-800/50 rounded-2xl border border-white/10 group-hover:border-blue-500/50 transition-colors backdrop-blur-sm">
-                     <ShieldCheck size={24} className="text-blue-400" />
+                 <div className="mb-3 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm group-hover:border-purple-500/50 transition-colors">
+                     <ShieldCheck size={24} className="text-purple-600" />
                  </div>
-                 <h3 className="font-bold text-sm md:text-base text-white">100% Secure</h3>
-                 <p className="text-xs text-stone-400 mt-1 hidden md:block">Safe payments & data</p>
+                 <h3 className="font-bold text-sm md:text-base text-slate-800">{t('benefit_secure')}</h3>
+                 <p className="text-xs text-slate-500 mt-1 hidden md:block">{t('benefit_secure_desc')}</p>
               </div>
           </div>
         </div>
@@ -115,8 +87,8 @@ const Home: React.FC = () => {
       <div className="py-24 bg-white relative z-20">
         <div className="max-w-6xl mx-auto px-6">
             <div className="text-center mb-16">
-                <h2 className="text-3xl md:text-4xl font-bold text-stone-900 mb-4">Technology meets Taste</h2>
-                <p className="text-stone-500 max-w-2xl mx-auto">We leverage advanced AI to streamline your experience, allowing our chefs to focus on what matters most: the food.</p>
+                <h2 className="text-3xl md:text-4xl font-bold text-stone-900 mb-4">{t('tech_title')}</h2>
+                <p className="text-stone-500 max-w-2xl mx-auto">{t('tech_desc')}</p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
@@ -126,7 +98,12 @@ const Home: React.FC = () => {
                     </div>
                     <h3 className="text-xl font-bold mb-3 text-stone-800">{t('feature_chat_title')}</h3>
                     <p className="text-stone-500 leading-relaxed text-sm mb-4">{t('feature_chat_desc')}</p>
-                    <Link to="/menu" className="mt-auto text-orange-600 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">Try AI Chat <ArrowRight size={16}/></Link>
+                    <button 
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-chat-widget'))}
+                        className="mt-auto text-orange-600 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all"
+                    >
+                        Try AI Chat <ArrowRight size={16}/>
+                    </button>
                 </div>
                 
                 <div className="p-8 rounded-3xl bg-stone-50 border border-stone-100 hover:shadow-xl transition-all duration-300 group flex flex-col items-start text-left">
@@ -145,8 +122,8 @@ const Home: React.FC = () => {
       <div className="bg-stone-50 py-24 border-t border-stone-100">
         <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-16">
-                <h2 className="text-3xl md:text-4xl font-bold text-stone-800 mb-4">Loved by Locals</h2>
-                <p className="text-stone-500">See what our guests are saying about their dining experience.</p>
+                <h2 className="text-3xl md:text-4xl font-bold text-stone-800 mb-4">{t('testimonials_title')}</h2>
+                <p className="text-stone-500">{t('testimonials_subtitle')}</p>
             </div>
             
             <div className="grid md:grid-cols-3 gap-8">
@@ -230,57 +207,115 @@ const Home: React.FC = () => {
         </div>
       </div>
 
-      {/* Scan & Connect Section */}
-      <div className="bg-stone-900 text-white py-24 overflow-hidden relative">
-         {/* Background elements */}
-         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-orange-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
-         <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-3xl translate-x-1/3 translate-y-1/3 pointer-events-none"></div>
-
-         <div className="max-w-6xl mx-auto px-6 relative z-10">
-            <div className="text-center mb-16">
-               <h2 className="text-4xl md:text-5xl font-bold mb-6">{t('scan_qr_title')}</h2>
-               <p className="text-stone-400 text-lg max-w-2xl mx-auto">{t('scan_qr_subtitle')}</p>
-            </div>
-
-            <div className="flex flex-col md:flex-row justify-center items-center gap-12 md:gap-24">
-               {/* WhatsApp QR */}
-               <div className="group relative">
-                  <div className="absolute inset-0 bg-green-500 rounded-3xl blur opacity-0 group-hover:opacity-20 transition duration-500"></div>
-                  <div className="relative bg-white/5 backdrop-blur-lg p-8 rounded-3xl flex flex-col items-center text-center border border-white/10 hover:border-green-500/50 transition duration-300">
-                      <div className="w-48 h-48 bg-white rounded-xl overflow-hidden mb-6 p-2">
-                         <img 
-                           src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://wa.me/971504291207`} 
-                           alt="WhatsApp QR" 
-                           className="w-full h-full object-cover"
-                         />
+      {/* COMPREHENSIVE FOOTER */}
+      <footer className="bg-stone-950 text-stone-400 py-16 border-t border-stone-900">
+          <div className="max-w-7xl mx-auto px-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+                  {/* Column 1: Brand & Lead Capture */}
+                  <div className="space-y-6">
+                      <Link to="/" className="flex items-center gap-2 text-white group w-fit">
+                          <div className="w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center font-serif font-black text-xl italic shadow-lg group-hover:rotate-6 transition duration-300">S</div>
+                          <div className="flex flex-col">
+                            <span className="font-serif font-bold text-2xl leading-none">Stanley's</span>
+                            <span className="text-[10px] uppercase tracking-widest text-stone-500">Fine Dining</span>
+                          </div>
+                      </Link>
+                      <p className="text-sm leading-relaxed text-stone-500">
+                          Blending culinary tradition with modern AI technology to create the world's most seamless dining experience.
+                      </p>
+                      
+                      {/* Newsletter Sign-up */}
+                      <div>
+                          <h4 className="text-white text-xs font-bold uppercase tracking-wider mb-3">Join our Newsletter</h4>
+                          <div className="flex gap-2">
+                              <input 
+                                type="email" 
+                                placeholder="Your email..." 
+                                className="bg-stone-900 border border-stone-800 rounded-lg px-4 py-2 text-sm w-full focus:outline-none focus:border-orange-600 transition"
+                              />
+                              <button className="bg-orange-600 text-white p-2 rounded-lg hover:bg-orange-700 transition">
+                                  <ArrowRight size={18}/>
+                              </button>
+                          </div>
                       </div>
-                      <div className="flex items-center gap-2 text-white font-bold text-xl mb-1">
-                         <MessageCircle className="text-green-500 fill-green-500" /> {t('scan_whatsapp')}
-                      </div>
-                      <p className="text-stone-400 text-sm font-mono">+971 504291207</p>
                   </div>
-               </div>
 
-               {/* System QR (Current URL) */}
-               <div className="group relative">
-                  <div className="absolute inset-0 bg-blue-500 rounded-3xl blur opacity-0 group-hover:opacity-20 transition duration-500"></div>
-                  <div className="relative bg-white/5 backdrop-blur-lg p-8 rounded-3xl flex flex-col items-center text-center border border-white/10 hover:border-blue-500/50 transition duration-300">
-                      <div className="w-48 h-48 bg-white rounded-xl overflow-hidden mb-6 p-2">
-                         <img 
-                           src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.href)}`} 
-                           alt="System QR" 
-                           className="w-full h-full object-cover"
-                         />
-                      </div>
-                      <div className="flex items-center gap-2 text-white font-bold text-xl mb-1">
-                         <Smartphone className="text-blue-500" /> {t('scan_website')}
-                      </div>
-                      <p className="text-stone-400 text-sm font-mono">Order via Web App</p>
+                  {/* Column 2: Navigation Links */}
+                  <div>
+                      <h4 className="text-white font-bold mb-6 flex items-center gap-2"><Navigation size={16} className="text-orange-600"/> Quick Links</h4>
+                      <ul className="space-y-3 text-sm">
+                          <li><Link to="/" className="hover:text-orange-500 transition flex items-center gap-2"><ChevronRight size={12}/> Home</Link></li>
+                          <li><Link to="/menu" className="hover:text-orange-500 transition flex items-center gap-2"><ChevronRight size={12}/> Our Menu</Link></li>
+                          <li><Link to="/info/about" className="hover:text-orange-500 transition flex items-center gap-2"><ChevronRight size={12}/> Our Story</Link></li>
+                          <li><Link to="/info/services" className="hover:text-orange-500 transition flex items-center gap-2"><ChevronRight size={12}/> Services</Link></li>
+                          <li><Link to="/info/location" className="hover:text-orange-500 transition flex items-center gap-2"><ChevronRight size={12}/> Locations</Link></li>
+                      </ul>
                   </div>
-               </div>
-            </div>
-         </div>
-      </div>
+
+                  {/* Column 3: Customer Support */}
+                  <div>
+                      <h4 className="text-white font-bold mb-6 flex items-center gap-2"><ShieldCheck size={16} className="text-orange-600"/> Support</h4>
+                      <ul className="space-y-3 text-sm">
+                          <li><Link to="/info/faq" className="hover:text-orange-500 transition">FAQ & Help Center</Link></li>
+                          <li><Link to="/info/contact" className="hover:text-orange-500 transition">Contact Us</Link></li>
+                          <li><a href="#" className="hover:text-orange-500 transition">Shipping Policy</a></li>
+                          <li><a href="#" className="hover:text-orange-500 transition">Returns & Refunds</a></li>
+                          <li><a href="#" className="hover:text-orange-500 transition">Terms of Service</a></li>
+                          <li><a href="#" className="hover:text-orange-500 transition">Privacy Policy</a></li>
+                      </ul>
+                  </div>
+
+                  {/* Column 4: Contact & Location */}
+                  <div>
+                      <h4 className="text-white font-bold mb-6 flex items-center gap-2"><MapPin size={16} className="text-orange-600"/> Find Us</h4>
+                      <ul className="space-y-4 text-sm">
+                          <li className="flex items-start gap-3">
+                              <MapPin size={18} className="text-stone-600 shrink-0 mt-0.5"/>
+                              <span>Sheikh Mohammed bin Rashid Blvd,<br/>Downtown Dubai, UAE</span>
+                          </li>
+                          <li className="flex items-center gap-3">
+                              <Phone size={18} className="text-stone-600 shrink-0"/>
+                              <a href="tel:+971504291207" className="hover:text-orange-500 transition">+971 50 429 1207</a>
+                          </li>
+                          <li className="flex items-center gap-3">
+                              <Mail size={18} className="text-stone-600 shrink-0"/>
+                              <a href="mailto:support@stanleys.com" className="hover:text-orange-500 transition">support@stanleys.com</a>
+                          </li>
+                          <li className="pt-4">
+                              <a href="https://maps.google.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-600 hover:text-orange-500 border border-orange-900 bg-orange-900/10 px-4 py-2 rounded-full transition">
+                                  <MapPin size={12}/> View on Map
+                              </a>
+                          </li>
+                      </ul>
+                  </div>
+              </div>
+
+              {/* Bottom Bar: Trust & Legal */}
+              <div className="border-t border-stone-900 pt-8 flex flex-col md:flex-row justify-between items-center gap-6">
+                  {/* Copyright */}
+                  <div className="text-xs text-stone-600">
+                      &copy; 2025 Stanley's Restaurant. All Rights Reserved.
+                  </div>
+
+                  {/* Social Media */}
+                  <div className="flex gap-4">
+                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-white transition"><Facebook size={14}/></a>
+                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-white transition"><Instagram size={14}/></a>
+                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-white transition"><Twitter size={14}/></a>
+                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-white transition"><Linkedin size={14}/></a>
+                  </div>
+
+                  {/* Payment Methods */}
+                  <div className="flex items-center gap-3 opacity-50 grayscale hover:grayscale-0 transition duration-300">
+                      <div className="flex items-center gap-1 text-xs font-bold text-stone-500"><CreditCard size={14}/> Secure Payment</div>
+                      {/* Simple visual representation of cards */}
+                      <div className="w-8 h-5 bg-stone-800 rounded"></div>
+                      <div className="w-8 h-5 bg-stone-800 rounded"></div>
+                      <div className="w-8 h-5 bg-stone-800 rounded"></div>
+                  </div>
+              </div>
+          </div>
+      </footer>
     </div>
   );
 };
