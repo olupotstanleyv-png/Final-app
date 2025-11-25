@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Users, HelpCircle, MapPin, Briefcase, Phone, Info as InfoIcon, Mail, Globe, MessageCircle, Clock, Link as LinkIcon, Instagram, Facebook, Zap, Award, TrendingUp, ArrowRight, ChefHat, Star, Coffee, Timer, Linkedin, Twitter, Navigation, Wifi, Car, Accessibility, Sun, Truck, Send, CheckCircle, Wine, Calendar, FileText, Shield, Download, Search, Plus, Minus, ChevronDown, ChevronUp } from 'lucide-react';
 import { getContactInfo } from '../services/menuRepository';
 import { ContactInfo } from '../types';
+import { ASSETS } from '../assets';
 
 // Mock Data for Branches
 const BRANCHES = [
@@ -18,7 +19,7 @@ const BRANCHES = [
         status: "Open Now",
         coordinates: { x: 55, y: 40 }, // % positions for mock map
         amenities: ["Valet Parking", "Outdoor Seating", "Wheelchair Accessible", "Free Wi-Fi"],
-        image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        image: ASSETS.backgrounds.locations.downtown,
         mapLink: "https://goo.gl/maps/downtown"
     },
     {
@@ -31,7 +32,7 @@ const BRANCHES = [
         status: "Open Now",
         coordinates: { x: 25, y: 65 },
         amenities: ["Waterfront View", "Bar Service", "Wheelchair Accessible"],
-        image: "https://images.unsplash.com/photo-1559339352-11d035aa65de?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        image: ASSETS.backgrounds.locations.marina,
         mapLink: "https://goo.gl/maps/marina"
     },
     {
@@ -44,7 +45,7 @@ const BRANCHES = [
         status: "Closing Soon",
         coordinates: { x: 65, y: 70 },
         amenities: ["Pickup Only", "Coffee Bar", "Free Parking"],
-        image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+        image: ASSETS.backgrounds.locations.alquoz,
         mapLink: "https://goo.gl/maps/alquoz"
     }
 ];
@@ -161,7 +162,7 @@ const Info: React.FC = () => {
                     </li>
                     <li className="flex items-center gap-3">
                         <Phone size={18} className="text-orange-500 shrink-0"/>
-                        <span>{contactInfo.phone}</span>
+                        <a href={`tel:${contactInfo.phone}`} className="hover:text-orange-500 transition">{contactInfo.phone}</a>
                     </li>
                     <li className="flex items-center gap-3">
                         <Mail size={18} className="text-orange-500 shrink-0"/>
@@ -203,7 +204,7 @@ const Info: React.FC = () => {
              {/* 1. HOOK AND VALUE PROPOSITION (HERO SECTION) */}
              <div className="relative h-[600px] rounded-3xl overflow-hidden mb-16 shadow-2xl">
                 <img 
-                    src="https://images.unsplash.com/photo-1514362545857-3bc16549766b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80" 
+                    src={ASSETS.backgrounds.about_kitchen}
                     alt="Chefs working" 
                     className="absolute inset-0 w-full h-full object-cover transform hover:scale-105 transition duration-[2000ms]"
                 />
@@ -252,9 +253,9 @@ const Info: React.FC = () => {
                     <div className="relative group">
                         <div className="absolute -inset-4 bg-orange-200 rounded-3xl transform rotate-3 transition-transform group-hover:rotate-6"></div>
                         <img 
-                            src="https://images.unsplash.com/photo-1556910103-1c02745a30bf?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" 
+                            src={ASSETS.backgrounds.hero_chef}
                             alt="The beginning" 
-                            className="relative rounded-2xl shadow-xl transform -rotate-3 transition-transform group-hover:rotate-0"
+                            className="relative rounded-2xl shadow-xl transform -rotate-3 transition-transform group-hover:rotate-0 w-full"
                         />
                     </div>
                 </div>
@@ -299,7 +300,7 @@ const Info: React.FC = () => {
                     <div className="grid md:grid-cols-2 gap-12">
                         {/* Founder 1 */}
                         <div className="bg-white p-10 rounded-3xl shadow-lg hover:shadow-2xl transition flex flex-col md:flex-row gap-8 items-center border border-stone-200/50">
-                            <img src="https://images.unsplash.com/photo-1583394293214-28ded15ee548?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80" alt="Chef" className="w-40 h-40 rounded-full object-cover shadow-md border-4 border-white" />
+                            <img src={ASSETS.team.chef_stanley} alt="Chef" className="w-40 h-40 rounded-full object-cover shadow-md border-4 border-white" />
                             <div className="text-center md:text-left">
                                 <h3 className="text-2xl font-bold text-stone-900">Stanley Chef</h3>
                                 <span className="text-orange-600 text-sm font-bold uppercase tracking-wide">The Taste</span>
@@ -311,7 +312,7 @@ const Info: React.FC = () => {
 
                         {/* Founder 2 */}
                         <div className="bg-white p-10 rounded-3xl shadow-lg hover:shadow-2xl transition flex flex-col md:flex-row gap-8 items-center border border-stone-200/50">
-                            <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80" alt="Tech Lead" className="w-40 h-40 rounded-full object-cover shadow-md border-4 border-white" />
+                            <img src={ASSETS.team.elena_tech} alt="Tech Lead" className="w-40 h-40 rounded-full object-cover shadow-md border-4 border-white" />
                             <div className="text-center md:text-left">
                                 <h3 className="text-2xl font-bold text-stone-900">Elena Tech</h3>
                                 <span className="text-blue-600 text-sm font-bold uppercase tracking-wide">The Brain</span>
@@ -323,7 +324,7 @@ const Info: React.FC = () => {
                     </div>
                     
                     <div className="mt-16 text-center">
-                         <img src="https://images.unsplash.com/photo-1556911220-e15b29be8c8f?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80" alt="Team Kitchen" className="w-full h-80 object-cover rounded-3xl shadow-xl filter grayscale hover:grayscale-0 transition duration-700"/>
+                         <img src={ASSETS.team.kitchen_crew} alt="Team Kitchen" className="w-full h-80 object-cover rounded-3xl shadow-xl filter grayscale hover:grayscale-0 transition duration-700"/>
                          <p className="mt-4 text-stone-500 text-sm font-bold uppercase tracking-widest">Our Kitchen Team at Work</p>
                     </div>
                 </div>
@@ -629,19 +630,24 @@ const Info: React.FC = () => {
         );
 
       case 'team':
+        const teamMembers = [
+            { name: 'Chef Stanley', role: 'Executive Chef', img: ASSETS.team.staff_1 },
+            { name: 'Chef Elena', role: 'Sous Chef', img: ASSETS.team.staff_2 },
+            { name: 'Alex', role: 'Head Server', img: ASSETS.team.staff_3 },
+        ];
         return (
             <div className="max-w-5xl mx-auto px-6 py-20">
                  <h1 className="text-4xl font-bold mb-10 text-center flex items-center justify-center gap-3">
                     <Users className="text-purple-500" /> {t('info_team_title')}
                  </h1>
                  <div className="grid md:grid-cols-3 gap-8">
-                    {[1, 2, 3].map(i => (
+                    {teamMembers.map((member, i) => (
                         <div key={i} className="text-center group">
                             <div className="w-48 h-48 mx-auto rounded-full overflow-hidden mb-4 shadow-lg">
-                                <img src={`https://i.pravatar.cc/300?img=${i + 10}`} alt="Team Member" className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
+                                <img src={member.img} alt={member.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
                             </div>
-                            <h3 className="font-bold text-xl">Chef Alex {String.fromCharCode(64 + i)}</h3>
-                            <p className="text-stone-500 text-sm uppercase tracking-widest">Executive Chef</p>
+                            <h3 className="font-bold text-xl">{member.name}</h3>
+                            <p className="text-stone-500 text-sm uppercase tracking-widest">{member.role}</p>
                         </div>
                     ))}
                  </div>
@@ -909,7 +915,7 @@ const Info: React.FC = () => {
                                      <div className="space-y-2 text-sm">
                                          <div className="flex items-center gap-2">
                                              <Phone size={14} className={activeBranchId === branch.id ? 'text-orange-500' : 'text-stone-400'}/>
-                                             <span>{branch.phone}</span>
+                                             <a href={`tel:${branch.phone}`} className="hover:underline">{branch.phone}</a>
                                          </div>
                                          <div className="flex items-center gap-2">
                                              <Clock size={14} className={activeBranchId === branch.id ? 'text-orange-500' : 'text-stone-400'}/>
@@ -933,7 +939,7 @@ const Info: React.FC = () => {
                                  {/* Static Map Image Background */}
                                  <div 
                                     className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-                                    style={{ backgroundImage: "url('https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/13/5286/3427.png')" }} 
+                                    style={{ backgroundImage: ASSETS.backgrounds.map_pattern ? `url('${ASSETS.backgrounds.map_pattern}')` : undefined }} 
                                  />
                                  <div className="absolute inset-0 bg-stone-900/5 pointer-events-none"></div>
 

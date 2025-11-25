@@ -31,15 +31,6 @@ export interface MenuItem {
   // New Fields for Advanced Ordering
   modifierGroups?: ModifierGroup[];
   dietaryLabels?: ('VG' | 'V' | 'GF' | 'Spicy')[]; 
-  // Inventory & IMS
-  stock: number;
-  sku?: string;
-  costPrice?: number; // For budgeting
-  supplierId?: string;
-  reorderPoint?: number; // ROP
-  safetyStock?: number;
-  leadTime?: number; // Days
-  binLocation?: string; // e.g., "A-12-04"
 }
 
 export interface Review {
@@ -61,7 +52,7 @@ export interface ChatMessage {
 export interface OrderMessage {
   id: string;
   orderId: string;
-  sender: 'customer' | 'agent';
+  sender: 'customer' | 'agent' | 'admin';
   text: string;
   timestamp: string;
   read: boolean;
@@ -102,14 +93,16 @@ export interface Order {
   phoneNumber: string;
   items: CartItem[];
   total: number;
+  discount?: number; // New field for POS discounts
+  deliveryFee?: number; // Added delivery fee
   status: 'pending_approval' | 'approved' | 'cancelled' | 'completed';
   timestamp: string;
   type: OrderType;
   source?: 'web_manual' | 'web_chat' | 'whatsapp' | 'pos';
   
   // Payment & Delivery
-  paymentMethod: 'cash' | 'card' | 'online_link';
-  paymentStatus: 'pending' | 'paid' | 'failed';
+  paymentMethod: 'cash' | 'card' | 'online_link' | 'mobile_nfc' | 'gift_card';
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded';
   paymentLink?: string;
   
   deliveryAgentId?: string;
@@ -121,6 +114,7 @@ export interface Order {
   // Security & Verification
   deliveryCode?: string; // 4-Digit PIN for customer verification
   proofOfDelivery?: ProofOfDelivery;
+  refundedAmount?: number;
 }
 
 export interface AdminUser {
@@ -170,6 +164,7 @@ export interface CartItem extends MenuItem {
   modifiers?: string; // Legacy string format
   selectedModifiers?: ModifierOption[]; // New structured format
   specialInstructions?: string;
+  returnedQuantity?: number;
 }
 
 export type OrderType = 'delivery' | 'pickup' | 'dine-in';
@@ -179,94 +174,6 @@ export enum ProcessingStatus {
   PROCESSING = 'processing',
   SUCCESS = 'success',
   ERROR = 'error'
-}
-
-// IMS Interfaces
-export interface Supplier {
-  id: string;
-  name: string;
-  contactPerson: string;
-  email: string;
-  phone: string;
-  leadTimeDays: number;
-  rating: number; // 1-5
-}
-
-export interface PurchaseOrder {
-  id: string;
-  supplierId: string;
-  status: 'draft' | 'ordered' | 'in_transit' | 'partially_received' | 'received' | 'cancelled';
-  items: POItem[];
-  totalCost: number;
-  createdAt: string;
-  expectedDate?: string;
-  receivedDate?: string;
-}
-
-export interface POItem {
-  itemId: string;
-  name: string;
-  sku: string;
-  quantityOrdered: number;
-  quantityReceived: number;
-  costPrice: number;
-  // Receiving Details
-  batchNumber?: string;
-  expiryDate?: string;
-  binLocation?: string;
-}
-
-export interface InventoryForecast {
-  itemId: string;
-  name: string;
-  currentStock: number;
-  dailyUsageRate: number; // Calculated from sales
-  suggestedReorder: number;
-  status: 'ok' | 'low' | 'critical' | 'overstock';
-  // New Analytics Fields
-  calculatedROP: number;
-  budgetRequired: number;
-  leadTime: number;
-}
-
-export interface InventoryTransaction {
-  id: string;
-  itemId: string;
-  itemName: string;
-  type: 'sale' | 'receipt' | 'adjustment' | 'return';
-  quantityChange: number;
-  reason?: string; // e.g., "Shrinkage", "Expired", "Cycle Count"
-  timestamp: string;
-  performedBy?: string;
-  batchNumber?: string;
-  expiryDate?: string;
-}
-
-// Cycle Counting & Auditing
-export interface CycleCountSession {
-  id: string;
-  status: 'in_progress' | 'completed';
-  items: CycleCountItem[];
-  createdAt: string;
-  completedAt?: string;
-  performedBy: string;
-}
-
-export interface CycleCountItem {
-  itemId: string;
-  name: string;
-  systemQty: number;
-  actualQty: number | null;
-  variance: number;
-  binLocation: string;
-}
-
-export interface InventoryReport {
-  totalValuation: number; // Sum of (Cost * Stock)
-  turnoverRate: number; // Sales / Avg Inventory
-  deadStockCandidates: MenuItem[]; // Items with stock > 0 but low movement
-  shrinkageValue: number; // Value of lost items
-  lowStockItems: MenuItem[]; // Items below reorder point
 }
 
 export interface AppConfig {

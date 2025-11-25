@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { MapPin, Phone, CheckCircle, Package, Navigation, Clock, RefreshCw, Camera, PenTool, X, ShieldCheck, Box, MessageCircle, Send, User } from 'lucide-react';
+import { MapPin, Phone, CheckCircle, Package, Navigation, Clock, RefreshCw, Camera, PenTool, X, ShieldCheck, Box, MessageCircle, Send, User, ChevronDown, Coffee, Power, AlertCircle } from 'lucide-react';
 import { Order, DeliveryAgent, ProofOfDelivery, OrderMessage } from '../types';
 import { fetchOrders, fetchAgents, updateOrderStatus, saveAgent, fetchOrderMessages, sendOrderMessage } from '../services/menuRepository';
 
@@ -15,6 +14,9 @@ const AgentPortal: React.FC = () => {
     const [notification, setNotification] = useState<string | null>(null);
     const prevOrdersCount = useRef(0);
     const isFirstLoad = useRef(true);
+
+    // UI State
+    const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
 
     // POD Modal State
     const [showPOD, setShowPOD] = useState<string | null>(null);
@@ -34,7 +36,11 @@ const AgentPortal: React.FC = () => {
         const currentAgent = agents.find(a => a.id === agentId);
         
         if (currentAgent) {
-            setAgent(currentAgent);
+            // Only update agent if status menu is closed to prevent UI jumping while interacting
+            if (!isStatusMenuOpen) {
+                setAgent(currentAgent);
+            }
+            
             const allOrders = await fetchOrders();
             // Filter for orders assigned to this agent that are active or completed today
             const myOrders = allOrders.filter(o => 
@@ -95,6 +101,15 @@ const AgentPortal: React.FC = () => {
         await updateOrderStatus(orderId, 'approved', agentId, newDeliveryStatus);
         await loadData();
         setNotification("Status updated. Customer notified 📲");
+    };
+
+    const handleAgentStatusChange = (newStatus: 'available' | 'busy' | 'on_break' | 'offline') => {
+        if (!agent) return;
+        const updatedAgent = { ...agent, status: newStatus };
+        setAgent(updatedAgent); // Optimistic update
+        saveAgent(updatedAgent);
+        setIsStatusMenuOpen(false);
+        setNotification(`Status set to ${newStatus.replace('_', ' ').toUpperCase()}`);
     };
 
     const handleCompleteDelivery = async (orderId: string) => {
@@ -164,9 +179,43 @@ const AgentPortal: React.FC = () => {
                         </h1>
                         <p className="text-xs text-stone-400 mt-0.5">Driver: {agent.name}</p>
                     </div>
-                    <div className="flex items-center gap-2 bg-stone-800 px-3 py-1.5 rounded-full border border-stone-700">
-                        <div className={`w-2.5 h-2.5 rounded-full ${agent.status === 'available' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : agent.status === 'on_break' ? 'bg-yellow-400' : 'bg-orange-400'}`}></div>
-                        <span className="text-xs font-bold uppercase tracking-wide">{agent.status.replace('_', ' ')}</span>
+                    
+                    <div className="relative">
+                        <button 
+                            onClick={() => setIsStatusMenuOpen(!isStatusMenuOpen)}
+                            className="flex items-center gap-2 bg-stone-800 px-3 py-1.5 rounded-full border border-stone-700 hover:bg-stone-700 transition cursor-pointer"
+                        >
+                            <div className={`w-2.5 h-2.5 rounded-full ${
+                                agent.status === 'available' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : 
+                                agent.status === 'on_break' ? 'bg-yellow-400' : 
+                                agent.status === 'busy' ? 'bg-orange-500' : 'bg-stone-500'
+                            }`}></div>
+                            <span className="text-xs font-bold uppercase tracking-wide">{agent.status.replace('_', ' ')}</span>
+                            <ChevronDown size={14} className="text-stone-400"/>
+                        </button>
+
+                        {isStatusMenuOpen && (
+                            <div className="absolute top-full right-0 mt-2 w-40 bg-stone-800 rounded-xl shadow-xl border border-stone-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                                <div className="p-1 space-y-1">
+                                    <button onClick={() => handleAgentStatusChange('available')} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-700 text-left transition">
+                                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                        <span className="text-xs font-bold text-stone-200">Available</span>
+                                    </button>
+                                    <button onClick={() => handleAgentStatusChange('busy')} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-700 text-left transition">
+                                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                        <span className="text-xs font-bold text-stone-200">Busy</span>
+                                    </button>
+                                    <button onClick={() => handleAgentStatusChange('on_break')} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-700 text-left transition">
+                                        <Coffee size={12} className="text-yellow-400" />
+                                        <span className="text-xs font-bold text-stone-200">On Break</span>
+                                    </button>
+                                    <button onClick={() => handleAgentStatusChange('offline')} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-stone-700 text-left transition">
+                                        <Power size={12} className="text-stone-400" />
+                                        <span className="text-xs font-bold text-stone-200">Offline</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </header>
@@ -225,6 +274,7 @@ const AgentPortal: React.FC = () => {
                                         <div className="flex justify-between items-start mb-2">
                                             <div>
                                                 <p className="font-bold text-stone-800 text-sm">{order.customerName}</p>
+                                                {/* Agent can see full number */}
                                                 <p className="text-xs text-stone-500">{order.phoneNumber}</p>
                                             </div>
                                             <a href={`tel:${order.phoneNumber}`} className="bg-white border border-stone-200 p-2 rounded-full text-stone-600 hover:text-green-600"><Phone size={14}/></a>
@@ -300,7 +350,7 @@ const AgentPortal: React.FC = () => {
                                             <p className="text-green-700 font-bold text-xs flex items-center justify-center gap-2">
                                                 <CheckCircle size={14}/> Completed Successfully
                                             </p>
-                                            <p className="text-[10px] text-green-600 mt-1">
+                                            <p className="text-green-600 text-[10px] mt-1">
                                                 {order.proofOfDelivery?.type === 'code' ? 'Verified via Code' : 'Photo Proof Uploaded'}
                                             </p>
                                         </div>

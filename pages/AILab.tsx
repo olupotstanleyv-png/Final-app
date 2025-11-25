@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Camera, Film, MapPin, Search, Sparkles, Wand2, Upload } from 'lucide-react';
 import { generateMarketingImage, generateFoodVideo, editFoodImage, searchFoodTrends, findNearbySuppliers, analyzeFoodImage } from '../services/gemini';
@@ -74,9 +75,10 @@ const VisualsStudio: React.FC = () => {
   const [editLoading, setEditLoading] = useState(false);
 
   const checkKey = async () => {
-    const hasKey = await window.aistudio.hasSelectedApiKey();
+    // Cast window to any to access aistudio which is injected by the environment
+    const hasKey = await (window as any).aistudio.hasSelectedApiKey();
     if (!hasKey) {
-      await window.aistudio.openSelectKey();
+      await (window as any).aistudio.openSelectKey();
     }
     return true; // Assume success per instructions
   };

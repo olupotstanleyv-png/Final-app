@@ -1,23 +1,28 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
     ArrowLeft, Printer, MapPin, Phone, User, CreditCard, Clock, 
     ShoppingBag, Truck, CheckCircle, XCircle, AlertCircle, Navigation, 
-    Calendar, Mail, Shield, Send, MessageCircle, Lock, Info
+    Calendar, Mail, Send, MessageCircle, Lock, Info, FileText, RefreshCw,
+    RotateCcw
 } from 'lucide-react';
 import { Order, DeliveryAgent, OrderMessage } from '../types';
-import { fetchOrders, fetchAgents, updateOrderStatus, fetchOrderMessages, sendOrderMessage, maskPhoneNumber, updateOrderPickupTime } from '../services/menuRepository';
+import { fetchOrders, fetchAgents, updateOrderStatus, fetchOrderMessages, sendOrderMessage, maskPhoneNumber, updateOrderPickupTime, exportDataAsCSV, returnOrderItem } from '../services/menuRepository';
 
 const OrderDetails: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
+  // Data State
   const [order, setOrder] = useState<Order | null>(null);
   const [agents, setAgents] = useState<DeliveryAgent[]>([]);
   const [assignedAgent, setAssignedAgent] = useState<DeliveryAgent | null>(null);
+  
+  // UI State
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Chat State
@@ -30,9 +35,12 @@ const OrderDetails: React.FC = () => {
   const defaultDest = { lat: 25.2048, lng: 55.2708 };
   const destination = order?.deliveryLocation || defaultDest;
 
-  useEffect(() => {
-    const loadData = async () => {
-        if (!orderId) return;
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+        if (!orderId) throw new Error("No Order ID provided");
+        
         const allOrders = await fetchOrders();
         const allAgents = fetchAgents();
         
@@ -47,17 +55,28 @@ const OrderDetails: React.FC = () => {
                 if (agent) {
                     setAgentPos({ lat: agent.currentLat, lng: agent.currentLng });
                 }
+            } else {
+                setAssignedAgent(null);
             }
+        } else {
+            // Order ID provided but not found in DB
+            setOrder(null);
         }
+    } catch (err: any) {
+        console.error("Error loading order:", err);
+        setError(err.message || "Failed to load order details. Please try again.");
+    } finally {
         setLoading(false);
-    };
-    loadData();
+    }
   }, [orderId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Auto-print logic
   useEffect(() => {
       if (!loading && order && searchParams.get('autoPrint') === 'true') {
-          // Small delay to ensure rendering
           setTimeout(() => {
               window.print();
           }, 500);
@@ -66,7 +85,7 @@ const OrderDetails: React.FC = () => {
 
   // Chat Polling
   useEffect(() => {
-      if (!orderId) return;
+      if (!orderId || error) return;
       const pollMessages = () => {
           const msgs = fetchOrderMessages(orderId);
           setMessages(msgs);
@@ -74,7 +93,7 @@ const OrderDetails: React.FC = () => {
       pollMessages();
       const interval = setInterval(pollMessages, 3000);
       return () => clearInterval(interval);
-  }, [orderId]);
+  }, [orderId, error]);
 
   // Scroll Chat to bottom
   useEffect(() => {
@@ -104,46 +123,115 @@ const OrderDetails: React.FC = () => {
   const handleStatusUpdate = async (newStatus: string) => {
     if (!order) return;
     setIsUpdating(true);
-    await updateOrderStatus(order.id, newStatus);
-    // Refresh local state
-    const allOrders = await fetchOrders();
-    const found = allOrders.find(o => o.id === order.id);
-    if (found) setOrder(found);
-    setIsUpdating(false);
+    try {
+        await updateOrderStatus(order.id, newStatus);
+        await loadData(); // Refresh data to reflect changes
+    } catch (e) {
+        alert("Failed to update status.");
+    } finally {
+        setIsUpdating(false);
+    }
   };
+  
+  const handleCancelOrder = async () => {
+    if (!order) return;
+    
+    if (!window.confirm("Are you sure you want to cancel this order? This action cannot be undone.")) {
+        return;
+    }
+
+    const reason = window.prompt("Please provide a cancellation reason for the customer:", "Administrative decision");
+    if (reason === null) return; // User cancelled prompt
+
+    setIsUpdating(true);
+    try {
+        // 1. Update status to cancelled
+        await updateOrderStatus(order.id, 'cancelled');
+        
+        // 2. Notify customer via chat
+        const notificationMsg = `⚠️ Order Cancelled. Reason: ${reason}. Please contact support for any issues.`;
+        sendOrderMessage(order.id, notificationMsg, 'admin');
+
+        await loadData();
+    } catch (e) {
+        alert("Failed to cancel order.");
+    } finally {
+        setIsUpdating(false);
+    }
+  };
+
+  const handleReturnItem = async (index: number) => {
+    if (!order) return;
+    const item = order.items[index];
+    const maxReturn = item.quantity - (item.returnedQuantity || 0);
+    
+    if (maxReturn <= 0) return alert("All items have been returned for this line.");
+
+    const qtyStr = prompt(`How many ${item.name} to return? (Max ${maxReturn})`, "1");
+    if (!qtyStr) return;
+    
+    const qty = parseInt(qtyStr);
+    
+    if (!isNaN(qty) && qty > 0 && qty <= maxReturn) {
+        setIsUpdating(true);
+        try {
+            await returnOrderItem(order.id, index, qty);
+            await loadData();
+        } catch(e: any) { 
+            alert(e.message); 
+        } finally { 
+            setIsUpdating(false); 
+        }
+    } else {
+        alert("Invalid quantity entered.");
+    }
+  }
 
   const handleSetPickupTime = async (time: string) => {
     if (!order) return;
     await updateOrderPickupTime(order.id, time);
-    // Refresh local state
-    const allOrders = await fetchOrders();
-    const found = allOrders.find(o => o.id === order.id);
-    if (found) setOrder(found);
+    await loadData();
   };
 
   const handleAgentAssign = async (agentId: string) => {
       if (!order) return;
       setIsUpdating(true);
-      await updateOrderStatus(order.id, order.status, agentId, 'ready_for_logistics');
-      
-      const allOrders = await fetchOrders();
-      const found = allOrders.find(o => o.id === order.id);
-      if (found) {
-          setOrder(found);
-          const agent = agents.find(a => a.id === agentId);
-          setAssignedAgent(agent || null);
+      try {
+          await updateOrderStatus(order.id, order.status, agentId, 'ready_for_logistics');
+          await loadData();
+      } catch (e) {
+          alert("Failed to assign agent.");
+      } finally {
+          setIsUpdating(false);
       }
-      setIsUpdating(false);
   };
 
   const handleSendMessage = () => {
       if (!newMessage.trim() || !order) return;
-      sendOrderMessage(order.id, newMessage, 'customer');
+      sendOrderMessage(order.id, newMessage, 'admin');
       setNewMessage('');
-      setMessages(fetchOrderMessages(order.id)); // Instant update
+      setMessages(fetchOrderMessages(order.id));
   };
 
-  // Map Projection Helper
+  const handleExportCSV = () => {
+      if (!order) return;
+      const invoiceData = order.items.map(item => ({
+          OrderID: order.id,
+          Date: new Date(order.timestamp).toLocaleDateString(),
+          CustomerName: order.customerName,
+          CustomerPhone: order.phoneNumber,
+          ItemName: item.name,
+          Quantity: item.quantity,
+          Returned: item.returnedQuantity || 0,
+          UnitPrice: item.price.toFixed(2),
+          LineTotal: (item.price * item.quantity).toFixed(2),
+          TotalOrderValue: order.total.toFixed(2),
+          PaymentMethod: order.paymentMethod,
+          Status: order.status
+      }));
+      exportDataAsCSV(invoiceData, `Invoice_${order.id}`);
+  };
+
   const getOffset = (pos: {lat: number, lng: number}) => {
       const MAP_SCALE = 40000;
       const dx = (pos.lng - destination.lng) * MAP_SCALE;
@@ -153,13 +241,53 @@ const OrderDetails: React.FC = () => {
   
   const agentOffset = getOffset(agentPos);
 
+  // --- RENDER STATES ---
+
   if (loading) {
-      return <div className="min-h-screen flex items-center justify-center bg-stone-50"><div className="animate-spin w-8 h-8 border-4 border-stone-900 border-t-transparent rounded-full"></div></div>;
+      return (
+          <div className="min-h-screen flex flex-col items-center justify-center bg-stone-50">
+              <div className="animate-spin w-10 h-10 border-4 border-stone-900 border-t-transparent rounded-full mb-4"></div>
+              <p className="text-stone-500 font-bold animate-pulse">Loading Order Details...</p>
+          </div>
+      );
+  }
+
+  if (error) {
+      return (
+          <div className="min-h-screen flex flex-col items-center justify-center bg-stone-50 p-6 text-center">
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center text-red-500 mb-6 shadow-sm">
+                  <AlertCircle size={40} />
+              </div>
+              <h2 className="text-3xl font-bold text-stone-900 mb-2">Something went wrong</h2>
+              <p className="text-stone-500 mb-8 max-w-md leading-relaxed">{error}</p>
+              <div className="flex gap-4">
+                  <button onClick={() => navigate('/admin')} className="px-6 py-3 bg-white border border-stone-200 rounded-xl font-bold text-stone-600 hover:bg-stone-50 transition shadow-sm">
+                      Back to Orders
+                  </button>
+                  <button onClick={loadData} className="px-6 py-3 bg-stone-900 text-white rounded-xl font-bold hover:bg-stone-800 transition shadow-lg flex items-center gap-2">
+                      <RefreshCw size={18}/> Retry
+                  </button>
+              </div>
+          </div>
+      );
   }
 
   if (!order) {
-      return <div className="min-h-screen flex items-center justify-center">Order not found.</div>;
+      return (
+          <div className="min-h-screen flex flex-col items-center justify-center bg-stone-50 p-6 text-center">
+              <div className="w-20 h-20 bg-stone-200 rounded-full flex items-center justify-center text-stone-400 mb-6">
+                  <ShoppingBag size={40} />
+              </div>
+              <h2 className="text-2xl font-bold text-stone-900 mb-2">Order Not Found</h2>
+              <p className="text-stone-500 mb-8">The order ID <span className="font-mono bg-stone-200 px-1 rounded">{orderId}</span> does not exist.</p>
+              <button onClick={() => navigate('/admin')} className="px-8 py-3 bg-stone-900 text-white rounded-xl font-bold hover:bg-stone-800 transition shadow-lg">
+                  Return to Order Manager
+              </button>
+          </div>
+      );
   }
+
+  const refundedTotal = order.items.reduce((acc, item) => acc + (item.price * (item.returnedQuantity || 0)), 0);
 
   return (
     <div className="min-h-screen bg-stone-50 pb-20 font-sans print:bg-white print:pb-0">
@@ -169,6 +297,11 @@ const OrderDetails: React.FC = () => {
                 .print-only { display: block !important; }
                 @page { margin: 0; size: auto; }
                 body { margin: 0; padding: 0; background: white; }
+            }
+            @keyframes dash {
+                to {
+                    stroke-dashoffset: -14;
+                }
             }
         `}</style>
 
@@ -181,7 +314,7 @@ const OrderDetails: React.FC = () => {
                     <p className="text-sm mt-4 text-stone-600">
                         Sheikh Mohammed bin Rashid Blvd<br/>
                         Downtown Dubai, UAE<br/>
-                        +971 50 429 1207
+                        <a href="tel:+971504291207" className="hover:text-stone-900">+971 50 429 1207</a>
                     </p>
                 </div>
                 <div className="text-right">
@@ -221,6 +354,7 @@ const OrderDetails: React.FC = () => {
                             <td className="py-3">
                                 <span className="font-bold block">{item.name}</span>
                                 {item.modifiers && <span className="text-xs text-stone-500">{item.modifiers}</span>}
+                                {item.returnedQuantity ? <span className="text-xs text-red-500 font-bold block">Returned: {item.returnedQuantity}</span> : null}
                             </td>
                             <td className="py-3 text-center">{item.quantity}</td>
                             <td className="py-3 text-right">${item.price.toFixed(2)}</td>
@@ -240,9 +374,15 @@ const OrderDetails: React.FC = () => {
                         <span>Tax (5%)</span>
                         <span>${(order.total - (order.total / 1.05)).toFixed(2)}</span>
                     </div>
+                    {refundedTotal > 0 && (
+                        <div className="flex justify-between py-2 text-sm text-red-600 font-bold border-b border-stone-100">
+                            <span>Refunded</span>
+                            <span>-${refundedTotal.toFixed(2)}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between py-4 text-xl font-bold text-stone-900">
                         <span>Total Due</span>
-                        <span>${order.total.toFixed(2)}</span>
+                        <span>${(order.total - refundedTotal).toFixed(2)}</span>
                     </div>
                 </div>
             </div>
@@ -278,22 +418,34 @@ const OrderDetails: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3 w-full md:w-auto">
-                    <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-stone-200 hover:bg-stone-50 rounded-lg text-sm font-bold text-stone-600 flex items-center gap-2 shadow-sm transition">
-                        <Printer size={16}/> Print / Download Invoice
+                    <button onClick={handleExportCSV} className="px-4 py-2 bg-stone-100 border border-stone-200 hover:bg-stone-200 rounded-lg text-sm font-bold text-stone-700 flex items-center gap-2 transition">
+                        <FileText size={16}/> CSV
                     </button>
+                    <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-stone-200 hover:bg-stone-50 rounded-lg text-sm font-bold text-stone-600 flex items-center gap-2 shadow-sm transition">
+                        <Printer size={16}/> Invoice
+                    </button>
+                    
+                    {/* CANCEL BUTTON */}
+                    {order.status !== 'cancelled' && order.status !== 'completed' && (
+                        <button 
+                            onClick={handleCancelOrder} 
+                            disabled={isUpdating} 
+                            className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-sm font-bold flex items-center gap-2 transition"
+                        >
+                            <XCircle size={16}/> Cancel
+                        </button>
+                    )}
+
                     {order.status === 'pending_approval' && (
                         <>
-                            <button onClick={() => handleStatusUpdate('cancelled')} disabled={isUpdating} className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-sm font-bold flex items-center gap-2 transition">
-                                <XCircle size={16}/> Reject
-                            </button>
                             <button onClick={() => handleStatusUpdate('approved')} disabled={isUpdating} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-md transition">
-                                <CheckCircle size={16}/> Approve Order
+                                <CheckCircle size={16}/> Approve
                             </button>
                         </>
                     )}
                     {order.status === 'approved' && (
                         <button onClick={() => handleStatusUpdate('completed')} disabled={isUpdating} className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-md transition">
-                            <CheckCircle size={16}/> Mark Completed
+                            <CheckCircle size={16}/> Complete
                         </button>
                     )}
                 </div>
@@ -305,7 +457,7 @@ const OrderDetails: React.FC = () => {
             {/* TOP SECTION: ORDER ITEMS TABLE */}
             <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="bg-stone-50 px-6 py-4 border-b border-stone-100 flex justify-between items-center">
-                    <h3 className="font-bold text-stone-800 text-sm flex items-center gap-2"><ShoppingBag size={18}/> Order Summary</h3>
+                    <h3 className="font-bold text-stone-800 text-sm flex items-center gap-2"><ShoppingBag size={18}/> Items Ordered</h3>
                     <span className="text-xs font-bold bg-stone-200 text-stone-600 px-3 py-1 rounded-full">{order.items.length} Items</span>
                 </div>
                 <div className="p-0 overflow-x-auto">
@@ -316,23 +468,52 @@ const OrderDetails: React.FC = () => {
                                 <th className="px-6 py-4 text-center">Quantity</th>
                                 <th className="px-6 py-4 text-right">Unit Price</th>
                                 <th className="px-6 py-4 text-right">Total</th>
+                                <th className="px-6 py-4 text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-stone-50">
                             {order.items.map((item, idx) => (
-                                <tr key={idx} className="hover:bg-stone-50/30 transition">
+                                <tr key={idx} className={`transition ${item.returnedQuantity === item.quantity ? 'bg-red-50' : 'hover:bg-stone-50/30'}`}>
                                     <td className="px-6 py-4">
                                         <div className="font-bold text-stone-900">{item.name}</div>
                                         {item.modifiers && (
-                                            <div className="text-xs text-orange-600 italic mt-0.5">Note: {item.modifiers}</div>
+                                            <div className="text-xs text-orange-600 italic mt-0.5">Mods: {item.modifiers}</div>
                                         )}
-                                        <div className="text-xs text-stone-400 mt-1 uppercase tracking-wide font-medium bg-stone-100 inline-block px-1.5 py-0.5 rounded">{item.category}</div>
+                                        {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                                            <div className="text-xs text-stone-500 mt-0.5">
+                                                {item.selectedModifiers.map(m => m.name).join(', ')}
+                                            </div>
+                                        )}
+                                        {item.specialInstructions && (
+                                            <div className="text-xs text-blue-600 mt-0.5 bg-blue-50 px-2 py-0.5 rounded inline-block">
+                                                Note: {item.specialInstructions}
+                                            </div>
+                                        )}
+                                        {item.returnedQuantity ? (
+                                            <div className="mt-1 text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded inline-block">
+                                                Returned: {item.returnedQuantity}
+                                            </div>
+                                        ) : null}
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <span className="bg-stone-100 text-stone-800 font-bold px-3 py-1 rounded-lg text-sm">{item.quantity}</span>
+                                        <div className="flex flex-col items-center">
+                                            <span className="bg-stone-100 text-stone-800 font-bold px-3 py-1 rounded-lg text-sm">{item.quantity}</span>
+                                            {item.returnedQuantity ? <span className="text-xs text-red-500 font-bold mt-1">(-{item.returnedQuantity})</span> : null}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-right text-sm text-stone-600 font-medium">${item.price.toFixed(2)}</td>
                                     <td className="px-6 py-4 text-right text-sm font-bold text-stone-900">${(item.price * item.quantity).toFixed(2)}</td>
+                                    <td className="px-6 py-4 text-center">
+                                        {(order.status === 'completed' || order.status === 'approved') && (!item.returnedQuantity || item.returnedQuantity < item.quantity) && (
+                                            <button 
+                                                onClick={() => handleReturnItem(idx)}
+                                                className="p-2 text-stone-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                                title="Return Item"
+                                            >
+                                                <RotateCcw size={16} />
+                                            </button>
+                                        )}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -348,9 +529,15 @@ const OrderDetails: React.FC = () => {
                             <span>Tax (5%)</span>
                             <span>${(order.total - (order.total / 1.05)).toFixed(2)}</span>
                         </div>
+                        {refundedTotal > 0 && (
+                            <div className="flex justify-between text-sm text-red-600 font-bold bg-red-50 px-2 py-1 rounded">
+                                <span>Refunded</span>
+                                <span>-${refundedTotal.toFixed(2)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between text-xl font-bold text-stone-900 pt-4 border-t border-stone-200 mt-2">
                             <span>Total Amount</span>
-                            <span>${order.total.toFixed(2)}</span>
+                            <span>${(order.total - refundedTotal).toFixed(2)}</span>
                         </div>
                     </div>
                 </div>
@@ -373,7 +560,7 @@ const OrderDetails: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="font-bold text-lg text-stone-900 leading-tight">{order.customerName}</p>
-                                    <p className="text-xs text-stone-400">Regular Customer</p>
+                                    <p className="text-xs text-stone-400">Valued Customer</p>
                                 </div>
                             </div>
                             <div className="pt-4 border-t border-stone-50 space-y-4">
@@ -401,7 +588,12 @@ const OrderDetails: React.FC = () => {
                     <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
                          <div className="bg-stone-50 px-6 py-4 border-b border-stone-100 flex justify-between items-center">
                             <h3 className="font-bold text-stone-800 text-sm flex items-center gap-2"><CreditCard size={16}/> Payment Info</h3>
-                            <span className={`text-[10px] font-bold uppercase px-3 py-1 rounded-full ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>{order.paymentStatus}</span>
+                            <span className={`text-[10px] font-bold uppercase px-3 py-1 rounded-full ${
+                                order.paymentStatus === 'paid' ? 'bg-green-100 text-green-600' : 
+                                order.paymentStatus === 'partially_refunded' ? 'bg-orange-100 text-orange-600' :
+                                order.paymentStatus === 'refunded' ? 'bg-red-100 text-red-600' :
+                                'bg-yellow-100 text-yellow-600'
+                            }`}>{order.paymentStatus.replace('_', ' ')}</span>
                         </div>
                         <div className="p-6">
                             <div className="flex justify-between items-center mb-4">
@@ -476,7 +668,9 @@ const OrderDetails: React.FC = () => {
                                                 <p className="font-bold text-stone-900 text-lg">{assignedAgent.name}</p>
                                                 <div className="text-xs text-stone-500 mb-1 flex items-center gap-1">
                                                     <Phone size={10} />
-                                                    <span className="font-mono">{maskPhoneNumber(assignedAgent.phone)}</span>
+                                                    <a href={`tel:${assignedAgent.phone}`} className="font-mono hover:text-blue-600 hover:underline">
+                                                        {maskPhoneNumber(assignedAgent.phone)}
+                                                    </a>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className={`w-2 h-2 rounded-full ${assignedAgent.status === 'available' ? 'bg-green-500' : 'bg-orange-500'}`}></span>
@@ -496,14 +690,15 @@ const OrderDetails: React.FC = () => {
                                                     <div className="text-center text-stone-400 text-xs py-10">No messages yet.</div>
                                                 )}
                                                 {messages.map(msg => (
-                                                    <div key={msg.id} className={`flex ${msg.sender === 'customer' ? 'justify-end' : 'justify-start'}`}>
+                                                    <div key={msg.id} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
                                                         <div className={`max-w-[80%] p-2 rounded-lg text-xs ${
-                                                            msg.sender === 'customer' 
+                                                            msg.sender === 'admin' 
                                                             ? 'bg-blue-600 text-white rounded-br-none' 
                                                             : 'bg-white text-stone-800 border border-stone-200 rounded-bl-none'
                                                         }`}>
+                                                            {msg.sender !== 'admin' && <p className="text-[9px] font-bold text-stone-400 uppercase mb-0.5">{msg.sender}</p>}
                                                             <p>{msg.text}</p>
-                                                            <span className={`text-[9px] block mt-1 text-right ${msg.sender === 'customer' ? 'text-blue-100' : 'text-stone-400'}`}>
+                                                            <span className={`text-[9px] block mt-1 text-right ${msg.sender === 'admin' ? 'text-blue-100' : 'text-stone-400'}`}>
                                                                 {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                                             </span>
                                                         </div>
@@ -570,6 +765,24 @@ const OrderDetails: React.FC = () => {
 
                              {/* Map Content centered on Screen Center (Customer Destination) */}
                              <div className="absolute top-1/2 left-1/2 w-0 h-0">
+                                 
+                                 {/* Route Line SVG */}
+                                 {assignedAgent && (
+                                    <svg className="absolute top-0 left-0 overflow-visible" style={{ transform: 'translate(0,0)' }}>
+                                        {/* The route line from Agent (x,y) to Customer (0,0) */}
+                                        <line 
+                                            x1={agentOffset.x} 
+                                            y1={agentOffset.y} 
+                                            x2={0} 
+                                            y2={0} 
+                                            stroke="#f97316" 
+                                            strokeWidth="3" 
+                                            strokeDasharray="6 4"
+                                            strokeLinecap="round"
+                                            className="animate-[dash_1s_linear_infinite]"
+                                        />
+                                    </svg>
+                                 )}
                                  
                                  {/* Agent Marker */}
                                  {assignedAgent && (

@@ -1,18 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, ChefHat, MessageCircle, Clock, Calendar, ShoppingBag, Utensils, Star, ShieldCheck, Heart, Award, Quote, ChevronRight, Phone, Facebook, Instagram, Twitter, Linkedin, MapPin, Mail, CreditCard, Navigation } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, ChefHat, MessageCircle, Clock, ShieldCheck, Sparkles, Database, Camera } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { ASSETS } from '../assets';
 
-// 3 Specific High Quality Slides
+// 3 Specific High Quality Slides from Assets
 const BACKGROUND_IMAGES = [
-  "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80", // Restaurant Interior / Atmosphere
-  "https://images.unsplash.com/photo-1556910103-1c02745a30bf?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80", // Chef Action / Kitchen
-  "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80"  // Plated Food / Culinary
+  ASSETS.backgrounds.hero_interior,
+  ASSETS.backgrounds.hero_chef,
+  ASSETS.backgrounds.hero_food
 ];
 
 const Home: React.FC = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [bgIndex, setBgIndex] = useState(0);
 
   useEffect(() => {
@@ -91,7 +93,8 @@ const Home: React.FC = () => {
                 <p className="text-stone-500 max-w-2xl mx-auto">{t('tech_desc')}</p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
+            <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
+                {/* Feature 1: Chat */}
                 <div className="p-8 rounded-3xl bg-stone-50 border border-stone-100 hover:shadow-xl transition-all duration-300 group flex flex-col items-start text-left hover:border-orange-200">
                     <div className="w-14 h-14 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300">
                         <MessageCircle size={28} />
@@ -106,216 +109,55 @@ const Home: React.FC = () => {
                     </button>
                 </div>
                 
-                <div className="p-8 rounded-3xl bg-stone-50 border border-stone-100 hover:shadow-xl transition-all duration-300 group flex flex-col items-start text-left hover:border-stone-300">
-                    <div className="w-14 h-14 bg-stone-200 text-stone-700 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300">
-                        <ChefHat size={28} />
+                {/* Feature 2: Menu */}
+                <div className="p-8 rounded-3xl bg-stone-50 border border-stone-100 hover:shadow-xl transition-all duration-300 group flex flex-col items-start text-left hover:border-blue-200">
+                    <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300">
+                        <Database size={28} />
                     </div>
                     <h3 className="text-xl font-bold mb-3 text-stone-800">{t('feature_menu_title')}</h3>
                     <p className="text-stone-500 leading-relaxed text-sm mb-4">{t('feature_menu_desc')}</p>
-                    <Link to="/menu" className="mt-auto text-stone-900 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">Browse Menu <ArrowRight size={16}/></Link>
+                    <Link 
+                        to="/admin"
+                        className="mt-auto text-blue-600 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all"
+                    >
+                        Manage Menu <ArrowRight size={16}/>
+                    </Link>
+                </div>
+
+                {/* Feature 3: Gen AI */}
+                <div className="p-8 rounded-3xl bg-stone-50 border border-stone-100 hover:shadow-xl transition-all duration-300 group flex flex-col items-start text-left hover:border-purple-200">
+                    <div className="w-14 h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300">
+                        <Sparkles size={28} />
+                    </div>
+                    <h3 className="text-xl font-bold mb-3 text-stone-800">{t('feature_gen_title')}</h3>
+                    <p className="text-stone-500 leading-relaxed text-sm mb-4">{t('feature_gen_desc')}</p>
+                    <Link 
+                        to="/ai-lab"
+                        className="mt-auto text-purple-600 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all"
+                    >
+                        Open Studio <Camera size={16} className="ml-1"/>
+                    </Link>
                 </div>
             </div>
         </div>
       </div>
 
-      {/* Social Proof / Testimonials */}
-      <div className="bg-stone-50 py-24 border-t border-stone-200">
-        <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-16">
-                <h2 className="text-3xl md:text-4xl font-bold text-stone-800 mb-4">{t('testimonials_title')}</h2>
-                <p className="text-stone-500">{t('testimonials_subtitle')}</p>
-            </div>
-            
-            <div className="grid md:grid-cols-3 gap-8">
-                {[
-                    { name: "Sarah Jenkins", role: "Food Critic", comment: "The fusion of tech and taste is incredible. The Wagyu Burger is a masterpiece.", rating: 5 },
-                    { name: "Michael Chen", role: "Verified Buyer", comment: "Ordering via WhatsApp was so smooth. The food arrived hot and fresh.", rating: 5 },
-                    { name: "Emma Wilson", role: "Regular Guest", comment: "Stanley's never disappoints. The AI suggestions were actually spot on!", rating: 4 }
-                ].map((review, i) => (
-                    <div key={i} className="bg-white p-8 rounded-3xl shadow-sm border border-stone-100 relative hover:shadow-lg transition duration-300 hover:-translate-y-1">
-                        <Quote size={40} className="absolute top-6 right-6 text-orange-100" />
-                        <div className="flex items-center gap-1 mb-4 text-amber-400">
-                            {[...Array(5)].map((_, idx) => (
-                                <Star key={idx} size={16} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-stone-200"} />
-                            ))}
-                        </div>
-                        <p className="text-stone-600 mb-6 italic leading-relaxed">"{review.comment}"</p>
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-gradient-to-br from-stone-200 to-stone-300 rounded-full flex items-center justify-center font-bold text-stone-600">
-                                {review.name[0]}
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-sm text-stone-900">{review.name}</h4>
-                                <p className="text-xs text-stone-400">{review.role}</p>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Trust Badges */}
-            <div className="mt-20 flex flex-wrap justify-center gap-8 md:gap-16 opacity-60 hover:opacity-100 transition-opacity duration-500 grayscale hover:grayscale-0">
-                <div className="flex items-center gap-3">
-                    <Award size={28} className="text-stone-800"/>
-                    <div className="text-left">
-                        <span className="block font-bold text-stone-700 text-sm">Top Rated</span>
-                        <span className="text-[10px] text-stone-500">2024 Excellence</span>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    <ShieldCheck size={28} className="text-stone-800"/>
-                     <div className="text-left">
-                        <span className="block font-bold text-stone-700 text-sm">Secure</span>
-                        <span className="text-[10px] text-stone-500">SSL Encrypted</span>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Heart size={28} className="text-stone-800"/>
-                     <div className="text-left">
-                        <span className="block font-bold text-stone-700 text-sm">Local</span>
-                        <span className="text-[10px] text-stone-500">Farm Sourced</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-      </div>
-
-      {/* Operating Hours Section */}
-      <div className="bg-white py-24 border-t border-stone-200 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#444_1px,transparent_1px)] [background-size:16px_16px]"></div>
-        <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
-           <h2 className="text-3xl font-bold text-stone-800 mb-12 tracking-tight">{t('operating_title')}</h2>
-           <div className="grid md:grid-cols-2 gap-8">
-              <div className="bg-stone-50 p-10 rounded-3xl shadow-sm hover:shadow-xl transition duration-300 flex flex-col items-center border border-stone-200/50 hover:border-orange-200">
-                  <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center text-orange-500 mb-6 transform rotate-3">
-                    <Clock size={32} />
-                  </div>
-                  <h3 className="text-lg font-bold text-stone-900 mb-1">Weekdays</h3>
-                  <p className="text-stone-500">{t('operating_week')}</p>
-              </div>
-              <div className="bg-stone-50 p-10 rounded-3xl shadow-sm hover:shadow-xl transition duration-300 flex flex-col items-center border border-stone-200/50 hover:border-orange-200">
-                  <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center text-orange-500 mb-6 transform -rotate-3">
-                    <Calendar size={32} />
-                  </div>
-                  <h3 className="text-lg font-bold text-stone-900 mb-1">Weekends</h3>
-                  <p className="text-stone-500">{t('operating_weekend')}</p>
-              </div>
-           </div>
-           <div className="mt-12 inline-block px-8 py-4 bg-white rounded-full border border-stone-200 text-stone-500 italic shadow-sm text-sm">
-              {t('reservation_note')}
-           </div>
-        </div>
-      </div>
-
-      {/* COMPREHENSIVE FOOTER */}
-      <footer className="bg-stone-950 text-stone-400 py-16 border-t border-stone-900">
-          <div className="max-w-7xl mx-auto px-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-                  {/* Column 1: Brand & Lead Capture */}
-                  <div className="space-y-6">
-                      <Link to="/" className="flex items-center gap-2 text-white group w-fit">
-                          <div className="w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center font-serif font-black text-xl italic shadow-lg group-hover:rotate-6 transition duration-300 text-stone-900">S</div>
-                          <div className="flex flex-col">
-                            <span className="font-serif font-bold text-2xl leading-none">Stanley's</span>
-                            <span className="text-[10px] uppercase tracking-widest text-stone-500">Fine Dining</span>
-                          </div>
-                      </Link>
-                      <p className="text-sm leading-relaxed text-stone-500">
-                          Blending culinary tradition with modern AI technology to create the world's most seamless dining experience.
-                      </p>
-                      
-                      {/* Newsletter Sign-up */}
-                      <div>
-                          <h4 className="text-white text-xs font-bold uppercase tracking-wider mb-3">Join our Newsletter</h4>
-                          <div className="flex gap-2">
-                              <input 
-                                type="email" 
-                                placeholder="Your email..." 
-                                className="bg-stone-900 border border-stone-800 rounded-lg px-4 py-2 text-sm w-full focus:outline-none focus:border-orange-600 transition"
-                              />
-                              <button className="bg-orange-600 text-stone-900 p-2 rounded-lg hover:bg-orange-700 transition">
-                                  <ArrowRight size={18}/>
-                              </button>
-                          </div>
-                      </div>
-                  </div>
-
-                  {/* Column 2: Navigation Links */}
-                  <div>
-                      <h4 className="text-white font-bold mb-6 flex items-center gap-2"><Navigation size={16} className="text-orange-600"/> Quick Links</h4>
-                      <ul className="space-y-3 text-sm">
-                          <li><Link to="/" className="hover:text-orange-500 transition flex items-center gap-2"><ChevronRight size={12}/> Home</Link></li>
-                          <li><Link to="/menu" className="hover:text-orange-500 transition flex items-center gap-2"><ChevronRight size={12}/> Our Menu</Link></li>
-                          <li><Link to="/info/about" className="hover:text-orange-500 transition flex items-center gap-2"><ChevronRight size={12}/> Our Story</Link></li>
-                          <li><Link to="/info/services" className="hover:text-orange-500 transition flex items-center gap-2"><ChevronRight size={12}/> Services</Link></li>
-                          <li><Link to="/info/location" className="hover:text-orange-500 transition flex items-center gap-2"><ChevronRight size={12}/> Locations</Link></li>
-                      </ul>
-                  </div>
-
-                  {/* Column 3: Customer Support */}
-                  <div>
-                      <h4 className="text-white font-bold mb-6 flex items-center gap-2"><ShieldCheck size={16} className="text-orange-600"/> Support</h4>
-                      <ul className="space-y-3 text-sm">
-                          <li><Link to="/info/faq" className="hover:text-orange-500 transition">FAQ & Help Center</Link></li>
-                          <li><Link to="/info/contact" className="hover:text-orange-500 transition">Contact Us</Link></li>
-                          <li><a href="#" className="hover:text-orange-500 transition">Shipping Policy</a></li>
-                          <li><a href="#" className="hover:text-orange-500 transition">Returns & Refunds</a></li>
-                          <li><a href="#" className="hover:text-orange-500 transition">Terms of Service</a></li>
-                          <li><a href="#" className="hover:text-orange-500 transition">Privacy Policy</a></li>
-                      </ul>
-                  </div>
-
-                  {/* Column 4: Contact & Location */}
-                  <div>
-                      <h4 className="text-white font-bold mb-6 flex items-center gap-2"><MapPin size={16} className="text-orange-600"/> Find Us</h4>
-                      <ul className="space-y-4 text-sm">
-                          <li className="flex items-start gap-3">
-                              <MapPin size={18} className="text-stone-600 shrink-0 mt-0.5"/>
-                              <span>Sheikh Mohammed bin Rashid Blvd,<br/>Downtown Dubai, UAE</span>
-                          </li>
-                          <li className="flex items-center gap-3">
-                              <Phone size={18} className="text-stone-600 shrink-0"/>
-                              <a href="tel:+971504291207" className="hover:text-orange-500 transition">+971 50 429 1207</a>
-                          </li>
-                          <li className="flex items-center gap-3">
-                              <Mail size={18} className="text-stone-600 shrink-0"/>
-                              <a href="mailto:support@stanleys.com" className="hover:text-orange-500 transition">support@stanleys.com</a>
-                          </li>
-                          <li className="pt-4">
-                              <a href="https://maps.google.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-600 hover:text-orange-500 border border-orange-900 bg-orange-900/10 px-4 py-2 rounded-full transition">
-                                  <MapPin size={12}/> View on Map
-                              </a>
-                          </li>
-                      </ul>
-                  </div>
-              </div>
-
-              {/* Bottom Bar: Trust & Legal */}
-              <div className="border-t border-stone-900 pt-8 flex flex-col md:flex-row justify-between items-center gap-6">
-                  {/* Copyright */}
-                  <div className="text-xs text-stone-600">
-                      &copy; 2025 Stanley's Restaurant. All Rights Reserved.
-                  </div>
-
-                  {/* Social Media */}
-                  <div className="flex gap-4">
-                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-stone-900 transition"><Facebook size={14}/></a>
-                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-stone-900 transition"><Instagram size={14}/></a>
-                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-stone-900 transition"><Twitter size={14}/></a>
-                      <a href="#" className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-stone-400 hover:bg-orange-600 hover:text-stone-900 transition"><Linkedin size={14}/></a>
-                  </div>
-
-                  {/* Payment Methods */}
-                  <div className="flex items-center gap-3 opacity-50 grayscale hover:grayscale-0 transition duration-300">
-                      <div className="flex items-center gap-1 text-xs font-bold text-stone-500"><CreditCard size={14}/> Secure Payment</div>
-                      {/* Simple visual representation of cards */}
-                      <div className="w-8 h-5 bg-stone-800 rounded"></div>
-                      <div className="w-8 h-5 bg-stone-800 rounded"></div>
-                      <div className="w-8 h-5 bg-stone-800 rounded"></div>
-                  </div>
+      {/* CTA Section */}
+      <div className="bg-stone-900 text-white py-24 px-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-stone-800 to-transparent opacity-50 pointer-events-none"></div>
+          <div className="max-w-4xl mx-auto text-center relative z-10">
+              <h2 className="text-4xl md:text-5xl font-black mb-6">{t('cta_ready_title')}</h2>
+              <p className="text-stone-400 text-lg mb-10 max-w-2xl mx-auto">{t('cta_ready_desc')}</p>
+              <div className="flex flex-col sm:flex-row justify-center gap-4">
+                  <Link to="/menu" className="bg-orange-600 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-orange-500 transition shadow-lg hover:shadow-orange-500/25">
+                      {t('cta_view_menu')}
+                  </Link>
+                  <Link to="/info/contact" className="bg-transparent border border-stone-700 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-stone-800 transition">
+                      {t('cta_visit')}
+                  </Link>
               </div>
           </div>
-      </footer>
+      </div>
     </div>
   );
 };

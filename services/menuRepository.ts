@@ -1,5 +1,6 @@
 
-import { MenuItem, Order, DeliveryAgent, AdminUser, SystemLog, AnalyticsMetrics, CartItem, Supplier, PurchaseOrder, InventoryForecast, POItem, InventoryTransaction, ProofOfDelivery, AppConfig, ContactInfo, OrderMessage, SalesMetrics, AgentNotificationSettings, CycleCountSession, InventoryReport } from '../types';
+import { MenuItem, Order, DeliveryAgent, AdminUser, SystemLog, AnalyticsMetrics, AppConfig, ContactInfo, OrderMessage, SalesMetrics, AgentNotificationSettings, ProofOfDelivery, CartItem } from '../types';
+import { ASSETS } from '../assets';
 
 const STORAGE_KEY = 'gourmetai_menu';
 const SETTINGS_KEY = 'gourmetai_db_settings';
@@ -9,12 +10,9 @@ const ORDERS_KEY = 'gourmetai_orders';
 const ADMINS_KEY = 'gourmetai_admins';
 const AGENTS_KEY = 'gourmetai_agents';
 const AGENT_NOTIFICATIONS_KEY = 'gourmetai_agent_notifications';
-const SUPPLIERS_KEY = 'gourmetai_suppliers';
-const PO_KEY = 'gourmetai_pos';
-const TRANSACTIONS_KEY = 'gourmetai_inv_transactions';
 const CONTACT_INFO_KEY = 'gourmetai_contact_info';
 const ORDER_CHATS_KEY = 'gourmetai_order_chats';
-const CYCLE_COUNTS_KEY = 'gourmetai_cycle_counts';
+const INVENTORY_KEY = 'gourmetai_inventory';
 
 const RESTAURANT_PHONE = '971504291207'; 
 
@@ -41,8 +39,34 @@ export interface BotSettings {
   temperature: number;
 }
 
+export interface InventoryItem {
+    id: string;
+    name: string;
+    unit: string;
+    quantity: number;
+    threshold: number;
+    cost: number;
+    category: string;
+    stockIn?: number; // Mock metric for dashboard
+    stockOut?: number; // Mock metric for dashboard
+}
+
+// Initial Mock Inventory
+const INITIAL_INVENTORY: InventoryItem[] = [
+    { id: 'inv_beef', name: 'Wagyu Beef', unit: 'kg', quantity: 50, threshold: 10, cost: 45.00, category: 'Meat', stockIn: 100, stockOut: 50 },
+    { id: 'inv_bun', name: 'Brioche Bun', unit: 'pcs', quantity: 100, threshold: 20, cost: 0.50, category: 'Bakery', stockIn: 200, stockOut: 100 },
+    { id: 'inv_chick', name: 'Chicken Breast', unit: 'kg', quantity: 40, threshold: 10, cost: 12.00, category: 'Meat', stockIn: 80, stockOut: 40 },
+    { id: 'inv_rice', name: 'Arborio Rice', unit: 'kg', quantity: 25, threshold: 5, cost: 4.00, category: 'Grains', stockIn: 50, stockOut: 25 },
+    { id: 'inv_truffle', name: 'Black Truffle', unit: 'g', quantity: 500, threshold: 50, cost: 2.50, category: 'Produce', stockIn: 1000, stockOut: 500 },
+    { id: 'inv_egg', name: 'Free-range Eggs', unit: 'pcs', quantity: 200, threshold: 30, cost: 0.30, category: 'Dairy', stockIn: 400, stockOut: 200 },
+    { id: 'inv_avocado', name: 'Hass Avocado', unit: 'pcs', quantity: 60, threshold: 10, cost: 1.20, category: 'Produce', stockIn: 100, stockOut: 40 },
+    { id: 'inv_salmon', name: 'Atlantic Salmon', unit: 'kg', quantity: 15, threshold: 5, cost: 22.00, category: 'Seafood', stockIn: 30, stockOut: 15 },
+    { id: 'inv_cheese', name: 'Parmesan Cheese', unit: 'kg', quantity: 8, threshold: 3, cost: 18.00, category: 'Dairy', stockIn: 15, stockOut: 7 },
+    { id: 'inv_oil', name: 'Truffle Oil', unit: 'L', quantity: 12, threshold: 4, cost: 35.00, category: 'Pantry', stockIn: 20, stockOut: 8 },
+];
+
 const DEFAULT_APP_CONFIG: AppConfig = {
-  deliveryFee: 15.00,
+  deliveryFee: 10.00,
   maxRetries: 3,
   logLevel: 'info',
   resourceLimit: 100
@@ -126,6 +150,117 @@ const fetchWithRetry = async (url: string, options?: RequestInit): Promise<Respo
     throw lastError;
 };
 
+// --- EXPORT UTILS (CSV) ---
+
+export const exportDataAsCSV = (data: any[], filename: string) => {
+    if (!data || !data.length) return;
+
+    // Get headers
+    const headers = Object.keys(data[0]);
+    
+    // Convert rows
+    const csvContent = [
+        headers.join(','), // Header row
+        ...data.map(row => headers.map(fieldName => {
+            let val = row[fieldName];
+            // Handle objects/arrays by stringifying or simplifying
+            if (typeof val === 'object' && val !== null) {
+                val = JSON.stringify(val).replace(/"/g, '""'); // Escape quotes
+            } else if (val === null || val === undefined) {
+                val = '';
+            } else {
+                val = String(val).replace(/"/g, '""');
+            }
+            return `"${val}"`;
+        }).join(','))
+    ].join('\r\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) { 
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${filename}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+};
+
+// --- BULK IMPORT (CSV) for POS ---
+export const bulkImportOrders = async (csvText: string) => {
+    const lines = csvText.split('\n');
+    let importedCount = 0;
+    
+    // Skip header, assuming Date, Item, Quantity, Price, Total structure or similar
+    // For simplicity, we create generic "Offline" orders
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // Very basic parsing logic, real logic would be robust
+        const parts = line.split(',');
+        if (parts.length >= 2) {
+             const newOrder: Order = {
+                id: `IMP-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                customerName: 'Imported Customer',
+                phoneNumber: '',
+                items: [{ 
+                    id: 'imp_item', 
+                    name: parts[0] || 'Imported Item', 
+                    price: parseFloat(parts[1]) || 0, 
+                    quantity: 1,
+                    description: 'Imported',
+                    category: 'Misc',
+                    imageUrl: '',
+                    available: true,
+                    phoneNumber: '',
+                }],
+                total: parseFloat(parts[parts.length - 1]) || 0,
+                status: 'pending_approval', // Default to pending so admin can review
+                timestamp: new Date().toISOString(),
+                type: 'dine-in',
+                source: 'pos',
+                paymentMethod: 'cash',
+                paymentStatus: 'paid'
+            };
+            await createOrder(newOrder);
+            importedCount++;
+        }
+    }
+    return importedCount;
+}
+
+export const bulkImportMenu = async (csvText: string) => {
+    const lines = csvText.split('\n');
+    let importedCount = 0;
+    
+    // Skip header. Assume format: Name, Price, Category, Description
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const parts = line.split(',');
+        if (parts.length >= 2) {
+             const newItem: MenuItem = {
+                id: `IMP-MENU-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                name: parts[0] || 'Imported Dish',
+                price: parseFloat(parts[1]) || 0,
+                category: parts[2] || 'Imported',
+                description: parts[3] || 'Imported via CSV',
+                imageUrl: ASSETS.products.categories.lunch,
+                available: true,
+                phoneNumber: RESTAURANT_PHONE,
+            };
+            await syncItem('add', newItem);
+            importedCount++;
+        }
+    }
+    return importedCount;
+}
+
 // --- PRIVACY UTILS ---
 export const maskPhoneNumber = (phone: string): string => {
     if (!phone) return 'Unknown';
@@ -138,15 +273,7 @@ export const maskPhoneNumber = (phone: string): string => {
     return `${prefix} **** ${suffix}`;
 };
 
-// --- INITIAL IMS DATA ---
-
-export const INITIAL_SUPPLIERS: Supplier[] = [
-    { id: 'SUP-001', name: 'Fresh Farms Ltd', contactPerson: 'John Green', email: 'orders@freshfarms.com', phone: '+971501234567', leadTimeDays: 2, rating: 4.8 },
-    { id: 'SUP-002', name: 'Global Foods Import', contactPerson: 'Sarah Lee', email: 'sarah@globalfoods.com', phone: '+971509876543', leadTimeDays: 14, rating: 4.2 },
-    { id: 'SUP-003', name: 'Bakery Supplies Co', contactPerson: 'Mike Dough', email: 'mike@bakerysupplies.com', phone: '+971505555555', leadTimeDays: 3, rating: 4.5 },
-];
-
-// Extend Initial Menu with IMS Data
+// --- INITIAL MENU DATA ---
 export const INITIAL_MENU: MenuItem[] = [
   { 
     id: '1', 
@@ -154,21 +281,13 @@ export const INITIAL_MENU: MenuItem[] = [
     description: 'Poached eggs, chili flakes, and microgreens on artisan bread.', 
     price: 14, 
     category: 'Breakfast', 
-    imageUrl: 'https://images.unsplash.com/photo-1525351484163-7529414395d8?auto=format&fit=crop&w=400&q=80', 
+    imageUrl: ASSETS.products.avocado_toast, 
     available: true, 
     phoneNumber: '+971504291207',
     calories: 450,
     allergens: ['Gluten', 'Eggs'],
     dietaryLabels: ['V'],
     ingredients: ['Sourdough Bread', 'Hass Avocado', 'Free-range Eggs', 'Chili Flakes', 'Microgreens', 'Olive Oil'],
-    stock: 50,
-    sku: 'BRK-AVO-001',
-    costPrice: 4.50,
-    supplierId: 'SUP-003',
-    reorderPoint: 20,
-    safetyStock: 10,
-    leadTime: 3,
-    binLocation: 'A-01-01',
     modifierGroups: [
         {
             id: 'bread',
@@ -200,21 +319,13 @@ export const INITIAL_MENU: MenuItem[] = [
     description: 'Fluffy stack with maple syrup and whipped butter.', 
     price: 12, 
     category: 'Breakfast', 
-    imageUrl: 'https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=400&q=80', 
+    imageUrl: ASSETS.products.pancakes, 
     available: true, 
     phoneNumber: '+971504291207',
     calories: 620,
     allergens: ['Gluten', 'Dairy', 'Eggs'],
     dietaryLabels: ['V'],
     ingredients: ['Flour', 'Blueberries', 'Maple Syrup', 'Butter', 'Milk', 'Eggs'],
-    stock: 35,
-    sku: 'BRK-PAN-002',
-    costPrice: 3.20,
-    supplierId: 'SUP-003',
-    reorderPoint: 15,
-    safetyStock: 5,
-    leadTime: 3,
-    binLocation: 'A-01-02'
   },
   { 
     id: '3', 
@@ -222,20 +333,12 @@ export const INITIAL_MENU: MenuItem[] = [
     description: 'Romaine hearts, parmesan crisps, and house dressing.', 
     price: 16, 
     category: 'Lunch', 
-    imageUrl: 'https://images.unsplash.com/photo-1550304943-4f24f54ddde9?auto=format&fit=crop&w=400&q=80', 
+    imageUrl: ASSETS.products.caesar_salad, 
     available: true, 
     phoneNumber: '+971504291207',
     calories: 380,
     allergens: ['Dairy', 'Fish (Anchovies)'],
     ingredients: ['Chicken Breast', 'Romaine Lettuce', 'Parmesan Cheese', 'Croutons', 'Caesar Dressing'],
-    stock: 20,
-    sku: 'LUN-CES-001',
-    costPrice: 6.00,
-    supplierId: 'SUP-001',
-    reorderPoint: 25, // Currently below ROP
-    safetyStock: 10,
-    leadTime: 2,
-    binLocation: 'B-02-01',
     modifierGroups: [
         {
             id: 'dressing',
@@ -265,20 +368,12 @@ export const INITIAL_MENU: MenuItem[] = [
     description: 'Premium beef patty with aged cheddar and truffle fries.', 
     price: 22, 
     category: 'Lunch', 
-    imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=400&q=80', 
+    imageUrl: ASSETS.products.wagyu_burger, 
     available: true, 
     phoneNumber: '+971504291207',
     calories: 950,
     allergens: ['Gluten', 'Dairy'],
     ingredients: ['Wagyu Beef', 'Brioche Bun', 'Aged Cheddar', 'Truffle Oil', 'Potatoes', 'Lettuce', 'Tomato'],
-    stock: 15,
-    sku: 'LUN-WAG-002',
-    costPrice: 12.50,
-    supplierId: 'SUP-002',
-    reorderPoint: 20, // Low stock
-    safetyStock: 8,
-    leadTime: 14,
-    binLocation: 'C-05-01',
     modifierGroups: [
         {
             id: 'temp',
@@ -322,21 +417,13 @@ export const INITIAL_MENU: MenuItem[] = [
     description: 'Creamy arborio rice with black truffle shavings.', 
     price: 28, 
     category: 'Dinner', 
-    imageUrl: 'https://images.unsplash.com/photo-1476124369491-e7addf5db371?auto=format&fit=crop&w=400&q=80', 
+    imageUrl: ASSETS.products.truffle_risotto, 
     available: true, 
     phoneNumber: '+971504291207',
     calories: 550,
     allergens: ['Dairy'],
     dietaryLabels: ['V', 'GF'],
     ingredients: ['Arborio Rice', 'Black Truffle', 'Parmesan Cheese', 'Butter', 'Vegetable Stock', 'White Wine'],
-    stock: 8,
-    sku: 'DIN-RIS-001',
-    costPrice: 9.00,
-    supplierId: 'SUP-002',
-    reorderPoint: 15, // Critical
-    safetyStock: 5,
-    leadTime: 14,
-    binLocation: 'B-03-04'
   },
   { 
     id: '6', 
@@ -344,21 +431,13 @@ export const INITIAL_MENU: MenuItem[] = [
     description: 'Served with asparagus and lemon butter sauce.', 
     price: 26, 
     category: 'Dinner', 
-    imageUrl: 'https://images.unsplash.com/photo-1467003909585-2f8a7270028d?auto=format&fit=crop&w=400&q=80', 
+    imageUrl: ASSETS.products.salmon, 
     available: false, 
     phoneNumber: '+971504291207',
     calories: 480,
     allergens: ['Fish', 'Dairy'],
     dietaryLabels: ['GF'],
     ingredients: ['Atlantic Salmon', 'Asparagus', 'Butter', 'Lemon', 'Dill', 'Garlic'],
-    stock: 0,
-    sku: 'DIN-SAL-002',
-    costPrice: 11.00,
-    supplierId: 'SUP-001',
-    reorderPoint: 10,
-    safetyStock: 5,
-    leadTime: 2,
-    binLocation: 'F-01-01'
   },
   { 
     id: '7', 
@@ -366,20 +445,12 @@ export const INITIAL_MENU: MenuItem[] = [
     description: 'Silky smooth cheesecake with japanese matcha.', 
     price: 10, 
     category: 'Desserts', 
-    imageUrl: 'https://images.unsplash.com/photo-1508737027454-e6454ef45afd?auto=format&fit=crop&w=400&q=80',
+    imageUrl: ASSETS.products.cheesecake, 
     available: true, 
     phoneNumber: '+971504291207',
     calories: 400,
     allergens: ['Dairy', 'Eggs', 'Gluten'],
     ingredients: ['Cream Cheese', 'Matcha Powder', 'Sugar', 'Eggs', 'Graham Cracker Crust'],
-    stock: 12,
-    sku: 'DES-MAT-001',
-    costPrice: 3.50,
-    supplierId: 'SUP-003',
-    reorderPoint: 15,
-    safetyStock: 5,
-    leadTime: 3,
-    binLocation: 'A-02-05'
   }
 ];
 
@@ -439,9 +510,6 @@ export const fetchMenu = async (): Promise<MenuItem[]> => {
         price: Number(item.price),
         available: item.available === 'Yes' || item.available === true,
         phoneNumber: item.phoneNumber ? String(item.phoneNumber) : '+971504291207',
-        stock: item.stock ? Number(item.stock) : 0,
-        costPrice: item.costPrice ? Number(item.costPrice) : 0,
-        reorderPoint: item.reorderPoint ? Number(item.reorderPoint) : 0,
         modifierGroups: item.modifierGroups ? JSON.parse(item.modifierGroups) : undefined,
         dietaryLabels: item.dietaryLabels ? JSON.parse(item.dietaryLabels) : undefined
       }));
@@ -460,33 +528,6 @@ export const fetchMenu = async (): Promise<MenuItem[]> => {
   return INITIAL_MENU;
 };
 
-// --- TRANSACTION LOGGING ---
-export const logInventoryTransaction = (
-    itemId: string,
-    itemName: string,
-    type: InventoryTransaction['type'],
-    quantityChange: number,
-    reason?: string,
-    batchNumber?: string
-) => {
-    const transaction: InventoryTransaction = {
-        id: `TXN-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        itemId,
-        itemName,
-        type,
-        quantityChange,
-        reason,
-        timestamp: new Date().toISOString(),
-        batchNumber
-    };
-    const stored = JSON.parse(localStorage.getItem(TRANSACTIONS_KEY) || '[]');
-    localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify([transaction, ...stored]));
-};
-
-export const getInventoryTransactions = (): InventoryTransaction[] => {
-    return JSON.parse(localStorage.getItem(TRANSACTIONS_KEY) || '[]');
-};
-
 export const syncItem = async (action: 'add' | 'update' | 'delete', item?: MenuItem, id?: string) => {
   const settings = getSettings();
   const currentMenu: MenuItem[] = await fetchMenu();
@@ -496,18 +537,8 @@ export const syncItem = async (action: 'add' | 'update' | 'delete', item?: MenuI
   if (action === 'delete' && id) {
     newMenu = newMenu.filter(i => i.id !== id);
   } else if (action === 'add' && item) {
-    // Force availability based on stock
-    item.available = item.stock > 0;
     newMenu.push(item);
   } else if (action === 'update' && item) {
-    const oldItem = newMenu.find(i => i.id === item.id);
-    if (oldItem && oldItem.stock !== item.stock) {
-        logInventoryTransaction(item.id, item.name, 'adjustment', item.stock - oldItem.stock, 'Manual Admin Update');
-    }
-    
-    // Auto toggle availability if stock hits 0, but respect manual overrides if stock > 0
-    if (item.stock <= 0) item.available = false;
-    
     newMenu = newMenu.map(i => i.id === item.id ? item : i);
   }
 
@@ -530,217 +561,70 @@ export const syncItem = async (action: 'add' | 'update' | 'delete', item?: MenuI
   }
 };
 
-// --- STOCK & IMS FUNCTIONS ---
+export const deleteInventoryItem = async (id: string) => {
+    await syncItem('delete', undefined, id);
+};
 
-export const fetchSuppliers = (): Supplier[] => {
-    const stored = localStorage.getItem(SUPPLIERS_KEY);
+// --- INVENTORY MANAGEMENT ---
+export const fetchInventory = (): InventoryItem[] => {
+    const stored = localStorage.getItem(INVENTORY_KEY);
     if (stored) return JSON.parse(stored);
-    localStorage.setItem(SUPPLIERS_KEY, JSON.stringify(INITIAL_SUPPLIERS));
-    return INITIAL_SUPPLIERS;
+    localStorage.setItem(INVENTORY_KEY, JSON.stringify(INITIAL_INVENTORY));
+    return INITIAL_INVENTORY;
 };
 
-export const fetchPurchaseOrders = (): PurchaseOrder[] => {
-    const stored = localStorage.getItem(PO_KEY);
-    if (stored) return JSON.parse(stored);
-    return [];
-};
-
-export const createPurchaseOrder = (po: PurchaseOrder) => {
-    const pos = fetchPurchaseOrders();
-    pos.push(po);
-    localStorage.setItem(PO_KEY, JSON.stringify(pos));
-    return po;
-};
-
-export const updatePurchaseOrder = (po: PurchaseOrder) => {
-    const pos = fetchPurchaseOrders();
-    const updated = pos.map(p => p.id === po.id ? po : p);
-    localStorage.setItem(PO_KEY, JSON.stringify(updated));
-    return updated;
-};
-
-// Receive PO: Updates Stock Levels, Bin Locations, and handles Batch Tracking
-export const receivePurchaseOrder = async (poId: string, receivedItems: Record<string, { qty: number, bin?: string, batch?: string, expiry?: string }>) => {
-    const pos = fetchPurchaseOrders();
-    const poIndex = pos.findIndex(p => p.id === poId);
-    if (poIndex === -1) throw new Error("PO not found");
+export const updateInventoryCounts = (deductions: { name: string, qty: number }[]) => {
+    let inventory = fetchInventory();
     
-    const po = pos[poIndex];
-    
-    // Update PO Item Counts
-    po.items = po.items.map(item => {
-        const receivedData = receivedItems[item.itemId];
-        if (receivedData) {
-            return {
-                ...item,
-                quantityReceived: item.quantityReceived + receivedData.qty,
-                binLocation: receivedData.bin || item.binLocation,
-                batchNumber: receivedData.batch || item.batchNumber,
-                expiryDate: receivedData.expiry || item.expiryDate
-            };
+    // Very simple loose matching logic for demo purposes
+    // Real system would use IDs mapped to ingredients
+    deductions.forEach(d => {
+        const itemIndex = inventory.findIndex(inv => 
+            d.name.toLowerCase().includes(inv.name.toLowerCase()) || 
+            inv.name.toLowerCase().includes(d.name.toLowerCase())
+        );
+        
+        if (itemIndex > -1) {
+            inventory[itemIndex].quantity = Math.max(0, inventory[itemIndex].quantity - d.qty);
+            // Add to stockOut metric simulation
+            inventory[itemIndex].stockOut = (inventory[itemIndex].stockOut || 0) + d.qty;
         }
-        return item;
     });
     
-    // Check if fully received
-    const allReceived = po.items.every(i => i.quantityReceived >= i.quantityOrdered);
-    const anyReceived = po.items.some(i => i.quantityReceived > 0);
+    localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory));
+    return inventory;
+};
+
+export const deductOrderInventory = (items: CartItem[]) => {
+    // 1. Break down items into ingredients
+    // This uses a naive mapping based on the 'ingredients' array in MenuItem
+    // In a real app, MenuItem would have recipe relations (IngredientID, Qty)
     
-    if (allReceived) {
-        po.status = 'received';
-        po.receivedDate = new Date().toISOString();
-    } else if (anyReceived) {
-        po.status = 'partially_received';
-    }
+    const deductions: { name: string, qty: number }[] = [];
 
-    // Update Stock Levels in Menu
-    const menu = await fetchMenu();
-    let menuUpdated = false;
+    items.forEach(item => {
+        if (item.ingredients) {
+            item.ingredients.forEach(ingName => {
+                // Assume 1 unit (e.g., 0.1kg or 1pc) per item quantity
+                // Specific logic: 
+                // Beef = 0.2kg per burger
+                // Bun = 1 per burger
+                let qtyToDeduct = 0.1 * item.quantity; 
+                
+                if (ingName.includes('Beef') || ingName.includes('Chicken') || ingName.includes('Salmon')) {
+                    qtyToDeduct = 0.2 * item.quantity;
+                } else if (ingName.includes('Bun') || ingName.includes('Egg') || ingName.includes('Avocado')) {
+                    qtyToDeduct = 1 * item.quantity;
+                } else if (ingName.includes('Rice')) {
+                    qtyToDeduct = 0.15 * item.quantity;
+                }
 
-    po.items.forEach(item => {
-        const receivedData = receivedItems[item.itemId];
-        if (receivedData && receivedData.qty > 0) {
-            const menuItem = menu.find(m => m.id === item.itemId);
-            if (menuItem) {
-                menuItem.stock += receivedData.qty;
-                menuItem.binLocation = receivedData.bin || menuItem.binLocation;
-                // Log Transaction
-                logInventoryTransaction(item.itemId, item.name, 'receipt', receivedData.qty, `PO Receipt: ${po.id}`, receivedData.batch);
-                menuUpdated = true;
-            }
+                deductions.push({ name: ingName, qty: qtyToDeduct });
+            });
         }
     });
 
-    if (menuUpdated) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(menu));
-    }
-
-    localStorage.setItem(PO_KEY, JSON.stringify(pos));
-    return po;
-};
-
-export const getInventoryAnalytics = async (): Promise<InventoryForecast[]> => {
-    const menu = await fetchMenu();
-    // In a real app, calculate daily usage rate from order history
-    return menu.map(item => ({
-        itemId: item.id,
-        name: item.name,
-        currentStock: item.stock,
-        dailyUsageRate: Math.floor(Math.random() * 5), // Mock
-        suggestedReorder: Math.max(0, (item.reorderPoint || 10) - item.stock),
-        status: item.stock === 0 ? 'critical' : item.stock < (item.reorderPoint || 10) ? 'low' : item.stock > 100 ? 'overstock' : 'ok',
-        calculatedROP: item.reorderPoint || 10,
-        budgetRequired: Math.max(0, (item.reorderPoint || 10) - item.stock) * (item.costPrice || 0),
-        leadTime: item.leadTime || 1
-    }));
-};
-
-export const performCycleCount = async (counts: Record<string, number>) => {
-    const menu = await fetchMenu();
-    const updatedMenu = menu.map(item => {
-        if (counts[item.id] !== undefined) {
-            const diff = counts[item.id] - item.stock;
-            if (diff !== 0) {
-                logInventoryTransaction(item.id, item.name, 'adjustment', diff, 'Cycle Count Adjustment');
-            }
-            return { ...item, stock: counts[item.id] };
-        }
-        return item;
-    });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedMenu));
-};
-
-// --- CYCLE COUNTING & REPORTING ---
-
-export const generateCycleCount = async (numItems: number = 5): Promise<CycleCountSession> => {
-    const menu = await fetchMenu();
-    // Shuffle and pick random items
-    const shuffled = menu.sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, numItems);
-
-    const session: CycleCountSession = {
-        id: `CC-${Date.now()}`,
-        status: 'in_progress',
-        createdAt: new Date().toISOString(),
-        performedBy: 'Admin',
-        items: selected.map(item => ({
-            itemId: item.id,
-            name: item.name,
-            systemQty: item.stock,
-            actualQty: null,
-            variance: 0,
-            binLocation: item.binLocation || 'N/A'
-        }))
-    };
-
-    const storedCounts = JSON.parse(localStorage.getItem(CYCLE_COUNTS_KEY) || '[]');
-    localStorage.setItem(CYCLE_COUNTS_KEY, JSON.stringify([...storedCounts, session]));
-    return session;
-};
-
-export const submitCycleCount = async (sessionId: string, items: { itemId: string, actualQty: number }[]) => {
-    const storedCounts = JSON.parse(localStorage.getItem(CYCLE_COUNTS_KEY) || '[]');
-    const sessionIdx = storedCounts.findIndex((s: CycleCountSession) => s.id === sessionId);
-    
-    if (sessionIdx === -1) throw new Error("Cycle count session not found");
-    const session = storedCounts[sessionIdx];
-    
-    // Update session
-    session.items = session.items.map((i: any) => {
-        const update = items.find(u => u.itemId === i.itemId);
-        if (update) {
-            return {
-                ...i,
-                actualQty: update.actualQty,
-                variance: update.actualQty - i.systemQty
-            };
-        }
-        return i;
-    });
-    session.status = 'completed';
-    session.completedAt = new Date().toISOString();
-    
-    // Apply updates to main inventory
-    const countsMap: Record<string, number> = {};
-    session.items.forEach((i: any) => {
-        if (i.actualQty !== null) countsMap[i.itemId] = i.actualQty;
-    });
-    await performCycleCount(countsMap); // This handles stock updates and logging
-
-    storedCounts[sessionIdx] = session;
-    localStorage.setItem(CYCLE_COUNTS_KEY, JSON.stringify(storedCounts));
-    return session;
-};
-
-export const getInventoryReport = async (): Promise<InventoryReport> => {
-    const menu = await fetchMenu();
-    const valuation = menu.reduce((acc, item) => acc + (item.stock * (item.costPrice || 0)), 0);
-    
-    // Mock Sales Calculation for turnover (Sales / Avg Inventory)
-    // In real app, sum transaction log 'sale' type
-    const transactions = getInventoryTransactions();
-    const salesQty = transactions.filter(t => t.type === 'sale').reduce((acc, t) => acc + Math.abs(t.quantityChange), 0);
-    const avgInventory = menu.reduce((acc, item) => acc + item.stock, 0) || 1; 
-    const turnover = salesQty / avgInventory;
-
-    // Shrinkage: Sum of negative cycle count adjustments
-    const shrinkage = transactions
-        .filter(t => t.type === 'adjustment' && t.quantityChange < 0 && t.reason?.includes('Cycle Count'))
-        .reduce((acc, t) => {
-             const item = menu.find(m => m.id === t.itemId);
-             return acc + (Math.abs(t.quantityChange) * (item?.costPrice || 0));
-        }, 0);
-
-    // Dead Stock: Items with stock > 0 but low movement (Mocked by checking if updated recently or simply low forecasted usage)
-    const deadStock = menu.filter(item => item.stock > 0 && Math.random() > 0.8); // Random mock for demo
-
-    return {
-        totalValuation: valuation,
-        turnoverRate: turnover,
-        shrinkageValue: shrinkage,
-        deadStockCandidates: deadStock,
-        lowStockItems: menu.filter(item => item.stock <= (item.reorderPoint || 0))
-    };
+    updateInventoryCounts(deductions);
 };
 
 // --- AGENTS ---
@@ -777,6 +661,12 @@ export const createOrder = async (order: Order): Promise<Order> => {
     const orders = await fetchOrders();
     orders.push(order);
     localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+    
+    // Trigger Inventory Deduction if completed (POS)
+    if (order.source === 'pos' && order.status === 'completed') {
+        deductOrderInventory(order.items);
+    }
+    
     return order;
 };
 
@@ -784,6 +674,12 @@ export const updateOrderStatus = async (orderId: string, status: string, agentId
     const orders = await fetchOrders();
     const idx = orders.findIndex(o => o.id === orderId);
     if (idx >= 0) {
+        // If transitioning to completed/approved for the first time from pending, deduct inventory (for online orders)
+        // Note: POS orders deduct on creation
+        if (orders[idx].source !== 'pos' && orders[idx].status === 'pending_approval' && status === 'approved') {
+            deductOrderInventory(orders[idx].items);
+        }
+
         orders[idx].status = status as any;
         if (agentId !== undefined) orders[idx].deliveryAgentId = agentId;
         if (deliveryStatus !== undefined) orders[idx].deliveryStatus = deliveryStatus as any;
@@ -794,14 +690,6 @@ export const updateOrderStatus = async (orderId: string, status: string, agentId
             orders[idx].deliveryCode = Math.floor(1000 + Math.random() * 9000).toString();
         }
         
-        // Deduct Inventory on Completion/Approval (depending on workflow, let's say Approval)
-        if (status === 'approved' && orders[idx].status !== 'approved') {
-             orders[idx].items.forEach(orderItem => {
-                 syncItem('update', { ...orderItem, stock: Math.max(0, orderItem.stock - orderItem.quantity) } as MenuItem);
-                 logInventoryTransaction(orderItem.id, orderItem.name, 'sale', -orderItem.quantity, `Order #${orderId}`);
-             });
-        }
-
         localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
     }
 };
@@ -813,6 +701,42 @@ export const updateOrderPickupTime = async (orderId: string, time: string) => {
         orders[idx].pickupTime = time;
         localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
     }
+};
+
+export const returnOrderItem = async (orderId: string, itemIndex: number, quantity: number) => {
+    const orders = await fetchOrders();
+    const idx = orders.findIndex(o => o.id === orderId);
+    if (idx >= 0) {
+        const order = orders[idx];
+        const item = order.items[itemIndex];
+        
+        if (!item.returnedQuantity) item.returnedQuantity = 0;
+        
+        if (item.returnedQuantity + quantity > item.quantity) {
+             throw new Error("Cannot return more than purchased");
+        }
+        
+        item.returnedQuantity += quantity;
+        
+        // Update status if needed
+        const totalReturned = order.items.reduce((sum, i) => sum + (i.returnedQuantity || 0), 0);
+        const totalQty = order.items.reduce((sum, i) => sum + i.quantity, 0);
+        
+        if (totalReturned === totalQty) {
+            order.paymentStatus = 'refunded';
+        } else if (totalReturned > 0) {
+            order.paymentStatus = 'partially_refunded';
+        }
+
+        localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+        
+        // Restock inventory? (Simplified: Yes)
+        // In real world, cooked food is waste, packaged goods are restock. 
+        // We will skip logic for simplicity or can implement `updateInventoryCounts` with negative values to add back.
+        
+        return order;
+    }
+    throw new Error("Order not found");
 };
 
 // --- ORDER CHAT ---
@@ -886,7 +810,7 @@ export const fetchSystemLogs = (): SystemLog[] => {
     ];
 };
 
-export const exportDataToSheet = async (type: 'menu' | 'orders' | 'inventory') => {
+export const exportDataToSheet = async (type: 'menu' | 'orders') => {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
     console.log(`Exported ${type} to Google Sheet`);
